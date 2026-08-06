@@ -1,4 +1,8 @@
 using System.Reflection;
+using System.Threading.RateLimiting;
+using GameOrg.Api.Features.Geography;
+using GameOrg.Api.Features.Sports;
+using GameOrg.Api.Features.Venues;
 using GameOrg.Infrastructure;
 using GameOrg.Infrastructure.Seed;
 using Microsoft.EntityFrameworkCore;
@@ -22,6 +26,32 @@ builder.Services.AddDbContext<GameOrgDbContext>(options => options
         builder.Configuration.GetConnectionString("Default"),
         npgsql => npgsql.UseNetTopologySuite())
     .UseSnakeCaseNamingConvention());
+
+// Как в текущем боте (src/webapp/server.ts) — 60 запросов/мин на IP.
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+    {
+        var key = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 60,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        });
+    });
+});
+
+// Только известные origin'ы из конфигурации — см. Cors:AllowedOrigins в appsettings.
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Default", policy => policy
+        .WithOrigins(allowedOrigins)
+        .AllowAnyHeader()
+        .AllowAnyMethod());
+});
 
 var app = builder.Build();
 
@@ -48,6 +78,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors("Default");
+app.UseRateLimiter();
 
 var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown";
 app.MapGet("/health", () => Results.Ok(new
@@ -56,6 +88,10 @@ app.MapGet("/health", () => Results.Ok(new
     version,
     env = app.Environment.EnvironmentName,
 }));
+
+app.MapSportsEndpoints();
+app.MapCitiesEndpoints();
+app.MapVenuesEndpoints();
 
 app.Run();
 

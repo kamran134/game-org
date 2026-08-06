@@ -1,0 +1,22 @@
+{
+  "name": "game-org-api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/gameOrgApiClient.js",
+  "types": "./dist/gameOrgApiClient.d.ts",
+  "scripts": {
+    "gen": "dotnet kiota generate -l typescript -d http://localhost:5100/openapi/v1.json -o src -c GameOrgApiClient -n game-org-api-client --clean-output",
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@microsoft/kiota-abstractions": "1.0.0-preview.103",
+    "@microsoft/kiota-serialization-form": "1.0.0-preview.103",
+    "@microsoft/kiota-serialization-json": "1.0.0-preview.103",
+    "@microsoft/kiota-serialization-multipart": "1.0.0-preview.103",
+    "@microsoft/kiota-serialization-text": "1.0.0-preview.103"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}
