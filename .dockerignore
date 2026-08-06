@@ -1,0 +1,21 @@
+# === .NET ===
+**/bin/
+**/obj/
+
+# === Node ===
+**/node_modules/
+**/.next/
+**/dist/
+**/.turbo/
+
+# === Git / IDE / misc ===
+.git/
+.vs/
+.vscode/
+*.user
+*.log
+
+# === Env / secrets — никогда в образ ===
+.env
+.env.*
+!.env.example

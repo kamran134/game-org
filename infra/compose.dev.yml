@@ -1,0 +1,76 @@
+# Dev-сервер (kamran, dev.game.org.az). Порты — только на loopback, наружу
+# смотрит только nginx (docs/PLAN.md §4.3). БД никуда не публикуется.
+# Секреты приходят из .env на сервере (заполняется CI из GitHub Secrets —
+# см. docs/PLAN.md §4.6), .env в репозиторий не коммитится.
+services:
+  db:
+    image: postgis/postgis:17-3.5-alpine
+    container_name: gameorg-dev-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=gameorg_dev
+      - POSTGRES_USER=gameorg
+      - POSTGRES_PASSWORD=${DB_PASSWORD_GAMEORG}
+      - TZ=Asia/Baku
+    volumes:
+      - gameorg-dev-db-data:/var/lib/postgresql/data
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gameorg -d gameorg_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options: { max-size: "10m", max-file: "3" }
+
+  api:
+    image: ghcr.io/kamran134/game-org/api:latest
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    container_name: gameorg-dev-api
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - AutoMigrate=true
+      - ConnectionStrings__Default=Host=db;Port=5432;Database=gameorg_dev;Username=gameorg;Password=${DB_PASSWORD_GAMEORG}
+      - Cors__AllowedOrigins__0=https://dev.game.org.az
+      - JWT_SIGNING_KEY=${JWT_SIGNING_KEY}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TZ=Asia/Baku
+    ports:
+      - "127.0.0.1:3100:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    mem_limit: 512m
+    logging:
+      driver: "json-file"
+      options: { max-size: "10m", max-file: "3" }
+
+  web:
+    image: ghcr.io/kamran134/game-org/web:latest
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    container_name: gameorg-dev-web
+    restart: unless-stopped
+    environment:
+      # Серверные вызовы (Server Components) идут напрямую в контейнер api,
+      # минуя nginx/Cloudflare — см. apps/web/src/lib/apiClient.ts.
+      - API_URL=http://api:8080
+      - NEXT_PUBLIC_API_URL=https://dev.game.org.az/api
+      - TZ=Asia/Baku
+    ports:
+      - "127.0.0.1:3101:3000"
+    depends_on:
+      - api
+    mem_limit: 768m
+    logging:
+      driver: "json-file"
+      options: { max-size: "10m", max-file: "3" }
+
+volumes:
+  gameorg-dev-db-data:
+    driver: local
