@@ -21,7 +21,7 @@
 |---|---|
 | Архитектура | Модульный монолит, API-first (клиенты: web, bot, будущий mobile) |
 | Backend | **C# / ASP.NET Core 9** — меньше поверхность зависимостей, батарейки в коробке, EF Core сильнее на агрегациях |
-| Frontend | **Next.js 15 + TypeScript** — SEO критичен для роста. **Blazor рассматривался и отвергнут** |
+| Frontend | **Next.js 16 + TypeScript** — SEO критичен для роста. **Blazor рассматривался и отвергнут** |
 | ORM | EF Core 9 + Npgsql + NetTopologySuite |
 | Фон. задачи | Hangfire на Postgres-хранилище — **Redis на старте НЕ нужен** |
 | БД | PostgreSQL 17 + PostGIS |
@@ -67,7 +67,7 @@ game-org/
 │   │   └── tests/
 │   │       ├── GameOrg.UnitTests/
 │   │       └── GameOrg.IntegrationTests/
-│   └── web/                             # Next.js 15
+│   └── web/                             # Next.js 16
 ├── packages/
 │   └── api-client/                      # TS-клиент, генерируется из OpenAPI. НЕ РЕДАКТИРОВАТЬ РУКАМИ.
 ├── infra/
@@ -115,7 +115,7 @@ Npgsql.EntityFrameworkCore.PostgreSQL.NetTopologySuite       9.*
 EFCore.NamingConventions                                     9.*
 ```
 
-`apps/web`: Next.js 15, React 19, TypeScript 5, Tailwind, shadcn/ui, next-intl.
+`apps/web`: Next.js 16, React 19, TypeScript 5, Tailwind, shadcn/ui, next-intl.
 
 **Не добавлять:** Redis, MediatR, AutoMapper, Elasticsearch, микросервисы.
 Если кажется, что нужны — сначала спросить пользователя.
@@ -130,7 +130,7 @@ EFCore.NamingConventions                                     9.*
 | Домен | `localhost` | `dev.game.org.az` | `game.org.az` |
 | API-порт (loopback) | 5100 | **3100** | 3100 |
 | Web-порт (loopback) | 3000 | **3101** | 3101 |
-| Postgres | контейнер, порт 5433 наружу | контейнер, наружу **не публиковать** | то же |
+| Postgres | контейнер, порт **5434** наружу (5433 занят нативным Postgres на машине разработчика) | контейнер, наружу **не публиковать** | то же |
 | БД / юзер | `gameorg_local` / `gameorg` | `gameorg_dev` / `gameorg` | `gameorg` / `gameorg` |
 | Миграции | `dotnet ef database update` вручную | автоматически при старте API | **только вручную**, отдельным шагом |
 | `ASPNETCORE_ENVIRONMENT` | `Development` | `Development` | `Production` |
@@ -276,7 +276,7 @@ Development, на проде — отдельной командой.
 - `infra/compose.local.yml` — только Postgres:
   ```yaml
   image: postgis/postgis:17-3.5-alpine
-  ports: ["5433:5432"]
+  ports: ["5434:5432"]  # 5433 занят нативным Postgres 15 на машине разработчика
   ```
 - Эндпоинт `GET /health` → `{ status, version, env }`
 - Serilog в консоль (JSON на dev/prod, читаемый текст локально)

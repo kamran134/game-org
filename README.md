@@ -14,7 +14,7 @@
 
 - **API**: ASP.NET Core 9, EF Core + Npgsql + NetTopologySuite, Hangfire (фон. задачи
   на Postgres, без Redis)
-- **Web**: Next.js 15, TypeScript, Tailwind
+- **Web**: Next.js 16, TypeScript, Tailwind
 - **БД**: PostgreSQL 17 + PostGIS
 - Бот `game-organization-bot` — отдельный репозиторий, не трогаем; в будущем станет
   клиентом этого API через `telegram_id`.
@@ -31,7 +31,14 @@ docs/         — план, схема БД
 
 ## Запуск локально
 
-Требуется: .NET 9 SDK, Node 20+, Docker (для Postgres).
+Требуется: .NET 9 SDK, Node 20+, Docker (только для Postgres+PostGIS).
+
+Docker используется исключительно под БД, не под API/web — те бегут нативно ради
+hot reload. Причина, почему БД именно в Docker, а не в нативном Postgres (если он
+у тебя уже стоит): PostGIS на Windows жёстко привязан к точной minor-версии Postgres
+и его версия должна совпадать с прод (`postgis/postgis:17-3.5-alpine`) — иначе
+гео-запросы (поиск площадок рядом) могут вести себя по-разному локально и в проде.
+Порт **5434** (не 5433) — чтобы не конфликтовать с уже установленным нативным Postgres.
 
 ```bash
 # 1. Поднять Postgres+PostGIS
