@@ -1,0 +1,1200 @@
+// =============================================================================
+//  game.org.az — Prisma schema
+//  PostgreSQL 16 + PostGIS. Требуется Prisma >= 6.6 (для uuid(7)).
+//
+//  Соглашения:
+//   • Все временные метки — UTC (timestamptz). У сущностей с «человеческим»
+//     временем (Event, User) рядом хранится IANA-таймзона.
+//   • Локализуемые справочники — Json вида { ru: "...", az: "...", en: "..." }.
+//   • deletedAt — soft-delete. Уникальные индексы по «живым» строкам делаются
+//     partial-индексами в raw SQL (см. prisma/sql/001_constraints.sql).
+//   • Денормализованные счётчики (membersCount, confirmedCount, ratingAvg)
+//     пересчитываются воркером из доменных событий, а не в транзакции запроса.
+// =============================================================================
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions", "relationJoins", "nativeDistinct"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [citext, pg_trgm, postgis, pgcrypto, btree_gin]
+}
+
+// =============================================================================
+//  ENUMS
+// =============================================================================
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum AuthProvider {
+  TELEGRAM
+  EMAIL
+  GOOGLE
+  APPLE
+}
+
+enum Visibility {
+  PUBLIC
+  FOLLOWERS
+  PRIVATE
+}
+
+enum SkillLevel {
+  BEGINNER
+  AMATEUR
+  INTERMEDIATE
+  ADVANCED
+  SEMI_PRO
+  PRO
+}
+
+enum Footedness {
+  LEFT
+  RIGHT
+  BOTH
+}
+
+enum VenueSurface {
+  NATURAL_GRASS
+  ARTIFICIAL_GRASS
+  PARQUET
+  RUBBER
+  SAND
+  CONCRETE
+  ICE
+  WATER
+  OTHER
+}
+
+enum VenueStatus {
+  DRAFT
+  PUBLISHED
+  HIDDEN
+  MERGED
+}
+
+enum ClubVisibility {
+  PUBLIC
+  REQUEST_ONLY
+  PRIVATE
+}
+
+enum ClubRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+  BANNED
+  LEFT
+}
+
+enum EventType {
+  GAME
+  TRAINING
+  TOURNAMENT
+  FRIENDLY
+}
+
+enum EventVisibility {
+  PUBLIC // виден всем, записаться может любой
+  CLUB // виден только членам клуба
+  UNLISTED // доступен по ссылке, не в поиске
+}
+
+enum EventStatus {
+  DRAFT
+  SCHEDULED // опубликовано, минимум не набран
+  CONFIRMED // минимум набран, игра состоится
+  CANCELLED
+  COMPLETED
+}
+
+enum CostSplit {
+  FREE
+  PER_PLAYER // cost = цена с человека
+  TOTAL // cost = стоимость аренды, делится на подтверждённых
+}
+
+enum GenderPolicy {
+  ANY
+  MEN_ONLY
+  WOMEN_ONLY
+  MIXED_REQUIRED
+}
+
+enum ParticipationStatus {
+  CONFIRMED
+  MAYBE
+  WAITLISTED
+  DECLINED // отписался до дедлайна
+  LATE_CANCEL // отписался после дедлайна
+  NO_SHOW // не пришёл
+  ATTENDED // подтверждено присутствие
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CARD_ONLINE
+  BALANCE
+}
+
+enum ActivityVerb {
+  CREATED_EVENT
+  JOINED_EVENT
+  COMPLETED_EVENT
+  JOINED_CLUB
+  CREATED_CLUB
+  REVIEWED_VENUE
+  EARNED_ACHIEVEMENT
+  ADDED_SPORT
+  RATING_MILESTONE
+}
+
+enum NotificationChannel {
+  TELEGRAM
+  PUSH
+  EMAIL
+  IN_APP
+}
+
+enum NotificationType {
+  EVENT_REMINDER_24H
+  EVENT_REMINDER_2H
+  EVENT_CREATED
+  EVENT_UPDATED
+  EVENT_CANCELLED
+  EVENT_CONFIRMED
+  PARTICIPANT_JOINED
+  PARTICIPANT_LEFT
+  WAITLIST_PROMOTED
+  PAYMENT_DUE
+  PAYMENT_CONFIRMED
+  CLUB_INVITE
+  CLUB_JOIN_REQUEST
+  NEW_FOLLOWER
+  MVP_VOTE_OPEN
+  RESULT_POSTED
+}
+
+enum DeliveryStatus {
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED // отключено настройками или quiet hours
+}
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+  WEB
+}
+
+enum MediaKind {
+  IMAGE
+  VIDEO
+}
+
+enum ReportReason {
+  SPAM
+  ABUSE
+  FAKE_PROFILE
+  WRONG_INFO
+  INAPPROPRIATE_CONTENT
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  REJECTED
+}
+
+// =============================================================================
+//  ГЕОГРАФИЯ
+// =============================================================================
+
+model City {
+  id          String  @id @default(uuid(7)) @db.Uuid
+  slug        String  @unique @db.Citext
+  nameI18n    Json // { ru: "Баку", az: "Bakı", en: "Baku" }
+  countryCode String  @db.Char(2)
+  lat         Float
+  lng         Float
+  timezone    String  @default("Asia/Baku")
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  users  User[]
+  venues Venue[]
+  clubs  Club[]
+
+  @@index([countryCode, isActive])
+  @@map("cities")
+}
+
+// =============================================================================
+//  IDENTITY
+// =============================================================================
+
+model User {
+  id           String     @id @default(uuid(7)) @db.Uuid
+  handle       String     @db.Citext // публичный ник: game.org.az/@rustam
+  displayName  String     @db.VarChar(80)
+  bio          String?    @db.VarChar(500)
+  birthDate    DateTime?  @db.Date
+  gender       Gender?
+  phone        String?    @db.VarChar(20)
+  locale       String     @default("ru") @db.VarChar(5)
+  timezone     String     @default("Asia/Baku")
+  status       UserStatus @default(ACTIVE)
+  isVerified   Boolean    @default(false) // «галочка»: тренер, владелец площадки
+  profileVisibility Visibility @default(PUBLIC)
+  lastActiveAt DateTime?
+  createdAt    DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime   @updatedAt @db.Timestamptz(3)
+  deletedAt    DateTime?  @db.Timestamptz(3)
+
+  cityId   String? @db.Uuid
+  city     City?   @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  avatarId String? @db.Uuid
+  avatar   MediaAsset? @relation("UserAvatar", fields: [avatarId], references: [id], onDelete: SetNull)
+
+  accounts          Account[]
+  sessions          Session[]
+  ownedMedia        MediaAsset[]        @relation("MediaOwner")
+  sports            UserSport[]
+  clubMemberships   ClubMember[]        @relation("ClubMemberUser")
+  clubInvitesSent   ClubMember[]        @relation("ClubMemberInviter")
+  createdClubs      Club[]              @relation("ClubCreator")
+  createdVenues     Venue[]             @relation("VenueCreator")
+  venueClaims       VenueClaim[]
+  venueReviews      VenueReview[]
+  createdEvents     Event[]             @relation("EventCreator")
+  createdSeries     EventSeries[]       @relation("SeriesCreator")
+  participations    EventParticipant[]  @relation("ParticipantUser")
+  guestsInvited     EventParticipant[]  @relation("ParticipantInviter")
+  resultsRecorded   EventResult[]       @relation("ResultRecorder")
+  mvpVotesCast      MvpVote[]           @relation("MvpVoter")
+  mvpVotesReceived  MvpVote[]           @relation("MvpTarget")
+  feedbackAuthored  PlayerFeedback[]    @relation("FeedbackAuthor")
+  feedbackReceived  PlayerFeedback[]    @relation("FeedbackTarget")
+  ratings           SportRating[]
+  reliability       ReliabilityStat?
+  following         Follow[]            @relation("Follower")
+  followers         Follow[]            @relation("FollowTargetUser")
+  activities        Activity[]          @relation("ActivityActor")
+  mentionedIn       Activity[]          @relation("ActivityTargetUser")
+  achievements      UserAchievement[]
+  paymentsMade      Payment[]           @relation("Payer")
+  paymentsConfirmed Payment[]           @relation("PaymentConfirmer")
+  notifications     Notification[]
+  notificationPrefs NotificationPreference[]
+  devices           DeviceToken[]
+  reportsFiled      Report[]            @relation("Reporter")
+  reportsAbout      Report[]            @relation("ReportedUser")
+  reportsResolved   Report[]            @relation("ReportResolver")
+  blocking          Block[]             @relation("Blocker")
+  blockedBy         Block[]             @relation("Blocked")
+  auditLogs         AuditLog[]
+
+  // handle уникален только среди «живых» — partial unique в raw SQL
+  @@index([cityId, status])
+  @@index([lastActiveAt(sort: Desc)])
+  @@map("users")
+}
+
+/// Способ входа. Один пользователь — несколько провайдеров.
+/// TELEGRAM.providerUserId = telegram_id, это мост к боту.
+model Account {
+  id              String       @id @default(uuid(7)) @db.Uuid
+  userId          String       @db.Uuid
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider        AuthProvider
+  providerUserId  String // telegram_id | google sub | нормализованный email
+  email           String?      @db.Citext
+  emailVerifiedAt DateTime?    @db.Timestamptz(3)
+  passwordHash    String? // только для EMAIL
+  meta            Json? // telegram username, photo_url, auth_date
+  createdAt       DateTime     @default(now()) @db.Timestamptz(3)
+  lastUsedAt      DateTime?    @db.Timestamptz(3)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@index([email])
+  @@map("accounts")
+}
+
+model Session {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  userId           String    @db.Uuid
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash String    @unique // sha256, сам токен не храним
+  userAgent        String?
+  ip               String?   @db.Inet
+  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
+  lastUsedAt       DateTime? @db.Timestamptz(3)
+  expiresAt        DateTime  @db.Timestamptz(3)
+  revokedAt        DateTime? @db.Timestamptz(3)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// =============================================================================
+//  ВИДЫ СПОРТА И КАРТОЧКА ИГРОКА
+// =============================================================================
+
+model Sport {
+  id           String  @id @default(uuid(7)) @db.Uuid
+  slug         String  @unique @db.Citext // football, volleyball, basketball
+  nameI18n     Json
+  emoji        String? @db.VarChar(8)
+  defaultTeamSize Int? // 5 для мини-футбола, 6 для волейбола
+  hasPositions Boolean @default(true)
+  hasScore     Boolean @default(true)
+  isTeamSport  Boolean @default(true)
+  isActive     Boolean @default(true)
+  sortOrder    Int     @default(0)
+
+  positions   SportPosition[]
+  userSports  UserSport[]
+  venueSports VenueSport[]
+  clubSports  ClubSport[]
+  events      Event[]
+  series      EventSeries[]
+  ratings     SportRating[]
+
+  @@map("sports")
+}
+
+model SportPosition {
+  id        String @id @default(uuid(7)) @db.Uuid
+  sportId   String @db.Uuid
+  sport     Sport  @relation(fields: [sportId], references: [id], onDelete: Cascade)
+  code      String @db.VarChar(12) // GK, CB, LW, SETTER, LIBERO
+  nameI18n  Json
+  sortOrder Int    @default(0)
+
+  userSportPositions UserSportPosition[]
+  participants       EventParticipant[]
+
+  @@unique([sportId, code])
+  @@map("sport_positions")
+}
+
+/// Суб-профиль игрока по конкретному виду спорта.
+/// Один человек = несколько UserSport, у каждого своя история и рейтинг.
+model UserSport {
+  id           String      @id @default(uuid(7)) @db.Uuid
+  userId       String      @db.Uuid
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sportId      String      @db.Uuid
+  sport        Sport       @relation(fields: [sportId], references: [id], onDelete: Cascade)
+  level        SkillLevel  @default(AMATEUR)
+  isPrimary    Boolean     @default(false)
+  playingSince Int? // год начала
+  footedness   Footedness? // футбол
+  heightCm     Int? // волейбол / баскетбол
+  jerseyNumber Int?
+  note         String?     @db.VarChar(280)
+  visibility   Visibility  @default(PUBLIC)
+  createdAt    DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime    @updatedAt @db.Timestamptz(3)
+
+  positions UserSportPosition[]
+
+  @@unique([userId, sportId])
+  @@index([sportId, level])
+  @@map("user_sports")
+}
+
+model UserSportPosition {
+  userSportId String        @db.Uuid
+  userSport   UserSport     @relation(fields: [userSportId], references: [id], onDelete: Cascade)
+  positionId  String        @db.Uuid
+  position    SportPosition @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  isPrimary   Boolean       @default(false)
+
+  @@id([userSportId, positionId])
+  @@map("user_sport_positions")
+}
+
+// =============================================================================
+//  ПЛОЩАДКИ
+// =============================================================================
+
+model Venue {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  slug        String        @unique @db.Citext
+  name        String        @db.VarChar(120)
+  description String?       @db.VarChar(2000)
+  address     String?       @db.VarChar(300)
+  cityId      String?       @db.Uuid
+  city        City?         @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  lat         Float
+  lng         Float
+  /// geography(Point,4326) — generated-колонка из lat/lng, GIST-индекс.
+  /// Prisma её не читает; радиусные запросы — через $queryRaw / ST_DWithin.
+  geom        Unsupported("geography(Point, 4326)")?
+  isIndoor    Boolean?
+  surface     VenueSurface?
+  hasLighting Boolean       @default(false)
+  hasShowers  Boolean       @default(false)
+  hasParking  Boolean       @default(false)
+  hasTribunes Boolean       @default(false)
+  priceHint   Decimal?      @db.Decimal(10, 2) // ориентир за час
+  currency    String        @default("AZN") @db.Char(3)
+  phone       String?       @db.VarChar(20)
+  website     String?       @db.VarChar(200)
+  openingHours Json? // { mon: [["08:00","23:00"]], ... }
+  status      VenueStatus   @default(PUBLISHED)
+  mergedIntoId String?      @db.Uuid // дедупликация каталога
+
+  ratingAvg   Decimal? @db.Decimal(3, 2) // денормализация
+  ratingCount Int      @default(0)
+  eventsCount Int      @default(0)
+
+  createdById String?   @db.Uuid
+  createdBy   User?     @relation("VenueCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt   DateTime? @db.Timestamptz(3)
+
+  sports   VenueSport[]
+  photos   VenuePhoto[]
+  reviews  VenueReview[]
+  claims   VenueClaim[]
+  events   Event[]
+  series   EventSeries[]
+  follows  Follow[]      @relation("FollowTargetVenue")
+  activities Activity[]  @relation("ActivityVenue")
+  reports  Report[]      @relation("ReportedVenue")
+
+  @@index([cityId, status])
+  @@index([status, ratingAvg(sort: Desc)])
+  @@map("venues")
+}
+
+model VenueSport {
+  venueId String @db.Uuid
+  venue   Venue  @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  sportId String @db.Uuid
+  sport   Sport  @relation(fields: [sportId], references: [id], onDelete: Cascade)
+  courts  Int    @default(1)
+
+  @@id([venueId, sportId])
+  @@index([sportId])
+  @@map("venue_sports")
+}
+
+model VenuePhoto {
+  id        String     @id @default(uuid(7)) @db.Uuid
+  venueId   String     @db.Uuid
+  venue     Venue      @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  mediaId   String     @db.Uuid
+  media     MediaAsset @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+  sortOrder Int        @default(0)
+  isCover   Boolean    @default(false)
+
+  @@unique([venueId, mediaId])
+  @@map("venue_photos")
+}
+
+model VenueReview {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  venueId   String    @db.Uuid
+  venue     Venue     @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  authorId  String    @db.Uuid
+  author    User      @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  rating    Int // 1..5, CHECK в raw SQL
+  text      String?   @db.VarChar(2000)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt DateTime? @db.Timestamptz(3)
+
+  reports Report[] @relation("ReportedReview")
+
+  @@unique([venueId, authorId])
+  @@index([venueId, createdAt(sort: Desc)])
+  @@map("venue_reviews")
+}
+
+/// Заявка владельца площадки на управление карточкой.
+model VenueClaim {
+  id         String       @id @default(uuid(7)) @db.Uuid
+  venueId    String       @db.Uuid
+  venue      Venue        @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  userId     String       @db.Uuid
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status     ReportStatus @default(OPEN)
+  evidence   String?      @db.VarChar(1000)
+  createdAt  DateTime     @default(now()) @db.Timestamptz(3)
+  resolvedAt DateTime?    @db.Timestamptz(3)
+
+  @@unique([venueId, userId])
+  @@map("venue_claims")
+}
+
+// =============================================================================
+//  КЛУБЫ (бывшие Telegram-группы бота)
+// =============================================================================
+
+model Club {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  slug           String         @unique @db.Citext
+  name           String         @db.VarChar(80)
+  description    String?        @db.VarChar(1000)
+  cityId         String?        @db.Uuid
+  city           City?          @relation(fields: [cityId], references: [id], onDelete: SetNull)
+  visibility     ClubVisibility @default(PUBLIC)
+  /// chat_id Telegram-группы — связь с ботом. Nullable: клуб может жить без TG.
+  telegramChatId BigInt?        @unique
+  inviteCode     String?        @unique @db.VarChar(16)
+  avatarId       String?        @db.Uuid
+  avatar         MediaAsset?    @relation("ClubAvatar", fields: [avatarId], references: [id], onDelete: SetNull)
+  coverId        String?        @db.Uuid
+  cover          MediaAsset?    @relation("ClubCover", fields: [coverId], references: [id], onDelete: SetNull)
+
+  membersCount Int @default(0)
+  eventsCount  Int @default(0)
+
+  createdById String?   @db.Uuid
+  createdBy   User?     @relation("ClubCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt   DateTime? @db.Timestamptz(3)
+
+  sports     ClubSport[]
+  members    ClubMember[]
+  events     Event[]
+  series     EventSeries[]
+  payments   Payment[]
+  follows    Follow[]      @relation("FollowTargetClub")
+  activities Activity[]    @relation("ActivityClub")
+
+  @@index([cityId, visibility])
+  @@map("clubs")
+}
+
+model ClubSport {
+  clubId  String @db.Uuid
+  club    Club   @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  sportId String @db.Uuid
+  sport   Sport  @relation(fields: [sportId], references: [id], onDelete: Cascade)
+
+  @@id([clubId, sportId])
+  @@index([sportId])
+  @@map("club_sports")
+}
+
+model ClubMember {
+  clubId      String           @db.Uuid
+  club        Club             @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  userId      String           @db.Uuid
+  user        User             @relation("ClubMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  role        ClubRole         @default(MEMBER)
+  status      MembershipStatus @default(ACTIVE)
+  invitedById String?          @db.Uuid
+  invitedBy   User?            @relation("ClubMemberInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+  joinedAt    DateTime         @default(now()) @db.Timestamptz(3)
+  leftAt      DateTime?        @db.Timestamptz(3)
+
+  @@id([clubId, userId])
+  @@index([userId, status])
+  @@index([clubId, role])
+  @@map("club_members")
+}
+
+// =============================================================================
+//  СОБЫТИЯ
+// =============================================================================
+
+/// Шаблон повторяющихся игр («каждый вторник 20:00»).
+/// Воркер материализует Event'ы на горизонт вперёд (напр. 8 недель).
+model EventSeries {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  clubId        String?   @db.Uuid
+  club          Club?     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  sportId       String    @db.Uuid
+  sport         Sport     @relation(fields: [sportId], references: [id])
+  venueId       String?   @db.Uuid
+  venue         Venue?    @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  rrule         String // RFC 5545: FREQ=WEEKLY;BYDAY=TU
+  timezone      String    @default("Asia/Baku")
+  startTime     String    @db.VarChar(5) // "20:00" локального времени
+  durationMin   Int       @default(90)
+  template      Json // поля Event: title, cost, maxParticipants, ...
+  materializedUntil DateTime? @db.Timestamptz(3)
+  isActive      Boolean   @default(true)
+  createdById   String?   @db.Uuid
+  createdBy     User?     @relation("SeriesCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+
+  events Event[]
+
+  @@index([isActive, materializedUntil])
+  @@map("event_series")
+}
+
+model Event {
+  id       String @id @default(uuid(7)) @db.Uuid
+  /// короткий публичный id для ссылок game.org.az/e/{publicId}
+  publicId String @unique @db.VarChar(12)
+
+  type       EventType       @default(GAME)
+  status     EventStatus     @default(SCHEDULED)
+  visibility EventVisibility @default(PUBLIC)
+
+  sportId String @db.Uuid
+  sport   Sport  @relation(fields: [sportId], references: [id])
+  clubId  String? @db.Uuid
+  club    Club?  @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  venueId String? @db.Uuid
+  venue   Venue? @relation(fields: [venueId], references: [id], onDelete: SetNull)
+  /// Если площадки нет в каталоге — свободный текст. Хотя бы одно из двух.
+  customLocation String? @db.VarChar(200)
+
+  title       String? @db.VarChar(120)
+  description String? @db.VarChar(2000)
+
+  startsAt DateTime @db.Timestamptz(3)
+  endsAt   DateTime @db.Timestamptz(3)
+  timezone String   @default("Asia/Baku")
+
+  minParticipants Int?
+  maxParticipants Int?
+  waitlistEnabled Boolean @default(true)
+
+  skillLevelMin SkillLevel?
+  skillLevelMax SkillLevel?
+  genderPolicy  GenderPolicy @default(ANY)
+  ageMin        Int?
+  ageMax        Int?
+
+  costSplit CostSplit @default(FREE)
+  cost      Decimal?  @db.Decimal(10, 2)
+  currency  String    @default("AZN") @db.Char(3)
+
+  registrationOpensAt  DateTime? @db.Timestamptz(3)
+  /// Абсолютный дедлайн записи. Вычисляется из lockHoursBeforeStart при
+  /// создании/переносе — чтобы не считать его в каждом запросе.
+  registrationClosesAt DateTime? @db.Timestamptz(3)
+  lockHoursBeforeStart Int?
+
+  confirmedCount Int @default(0) // денормализация
+  maybeCount     Int @default(0)
+  waitlistCount  Int @default(0)
+
+  seriesId String?      @db.Uuid
+  series   EventSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+
+  createdById  String?   @db.Uuid
+  createdBy    User?     @relation("EventCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  cancelledAt  DateTime? @db.Timestamptz(3)
+  cancelReason String?   @db.VarChar(300)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt    DateTime? @db.Timestamptz(3)
+
+  participants EventParticipant[]
+  teams        EventTeam[]
+  result       EventResult?
+  mvpVotes     MvpVote[]
+  feedback     PlayerFeedback[]
+  payments     Payment[]
+  activities   Activity[]         @relation("ActivityEvent")
+  reports      Report[]           @relation("ReportedEvent")
+
+  // Главный индекс дискавери: «публичные игры по футболу в ближайшие дни»
+  @@index([visibility, status, startsAt])
+  @@index([sportId, startsAt])
+  @@index([venueId, startsAt])
+  @@index([clubId, startsAt(sort: Desc)])
+  @@index([status, startsAt])
+  @@map("events")
+}
+
+/// Участник. userId = null → гость, приведённый другим игроком.
+/// Postgres считает NULL'ы различными, поэтому @@unique([eventId, userId])
+/// не мешает нескольким гостям на одном событии.
+model EventParticipant {
+  id      String @id @default(uuid(7)) @db.Uuid
+  eventId String @db.Uuid
+  event   Event  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  userId String? @db.Uuid
+  user   User?   @relation("ParticipantUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  guestName   String? @db.VarChar(80)
+  invitedById String? @db.Uuid
+  invitedBy   User?   @relation("ParticipantInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  status     ParticipationStatus @default(CONFIRMED)
+  positionId String?             @db.Uuid
+  position   SportPosition?      @relation(fields: [positionId], references: [id], onDelete: SetNull)
+
+  /// Порядок в очереди ожидания. NULL для не-WAITLISTED.
+  waitlistOrder Int?
+
+  teamId String?    @db.Uuid
+  team   EventTeam? @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  joinedAt        DateTime  @default(now()) @db.Timestamptz(3)
+  statusChangedAt DateTime  @default(now()) @db.Timestamptz(3)
+  checkedInAt     DateTime? @db.Timestamptz(3)
+  note            String?   @db.VarChar(200)
+
+  payments Payment[]
+
+  @@unique([eventId, userId])
+  @@index([eventId, status])
+  @@index([userId, status])
+  @@index([eventId, waitlistOrder])
+  @@map("event_participants")
+}
+
+model EventTeam {
+  id       String  @id @default(uuid(7)) @db.Uuid
+  eventId  String  @db.Uuid
+  event    Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  name     String  @db.VarChar(40)
+  colorHex String? @db.Char(7)
+  score    Int?
+  sortOrder Int    @default(0)
+
+  members EventParticipant[]
+
+  @@index([eventId])
+  @@map("event_teams")
+}
+
+model EventResult {
+  eventId      String   @id @db.Uuid
+  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  summary      String?  @db.VarChar(500)
+  /// Для не-командных видов: [{ userId, place, score }]
+  standings    Json?
+  mvpUserId    String?  @db.Uuid
+  recordedById String?  @db.Uuid
+  recordedBy   User?    @relation("ResultRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+  recordedAt   DateTime @default(now()) @db.Timestamptz(3)
+  /// true — рейтинги уже пересчитаны воркером (идемпотентность)
+  ratingsApplied Boolean @default(false)
+
+  @@map("event_results")
+}
+
+model MvpVote {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  eventId      String   @db.Uuid
+  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  voterId      String   @db.Uuid
+  voter        User     @relation("MvpVoter", fields: [voterId], references: [id], onDelete: Cascade)
+  targetUserId String   @db.Uuid
+  targetUser   User     @relation("MvpTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([eventId, voterId])
+  @@index([eventId, targetUserId])
+  @@map("mvp_votes")
+}
+
+// =============================================================================
+//  РЕПУТАЦИЯ И РЕЙТИНГИ
+// =============================================================================
+
+/// Glicko-2 на каждый вид спорта отдельно.
+model SportRating {
+  userId      String    @db.Uuid
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sportId     String    @db.Uuid
+  sport       Sport     @relation(fields: [sportId], references: [id], onDelete: Cascade)
+  rating      Float     @default(1500)
+  deviation   Float     @default(350)
+  volatility  Float     @default(0.06)
+  gamesPlayed Int       @default(0)
+  wins        Int       @default(0)
+  draws       Int       @default(0)
+  losses      Int       @default(0)
+  mvpCount    Int       @default(0)
+  peakRating  Float     @default(1500)
+  lastPlayedAt DateTime? @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+
+  @@id([userId, sportId])
+  @@index([sportId, rating(sort: Desc)]) // лидерборды
+  @@map("sport_ratings")
+}
+
+/// Надёжность — глобальная, не по видам спорта. Ключевая метрика доверия.
+model ReliabilityStat {
+  userId       String   @id @db.Uuid
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  signups      Int      @default(0)
+  attended     Int      @default(0)
+  noShows      Int      @default(0)
+  lateCancels  Int      @default(0)
+  hostedEvents Int      @default(0)
+  /// 0..100, пересчитывается воркером с затуханием старых нарушений
+  score        Int      @default(100)
+  currentStreak Int     @default(0) // недель подряд с игрой
+  longestStreak Int     @default(0)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([score])
+  @@map("reliability_stats")
+}
+
+/// Оценка игрока игроком после матча. Анонимна на выдаче, агрегируется.
+model PlayerFeedback {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  eventId   String   @db.Uuid
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  authorId  String   @db.Uuid
+  author    User     @relation("FeedbackAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  targetId  String   @db.Uuid
+  target    User     @relation("FeedbackTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  skill     Int? // 1..5
+  fairPlay  Int? // 1..5
+  comment   String?  @db.VarChar(500)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([eventId, authorId, targetId])
+  @@index([targetId])
+  @@map("player_feedback")
+}
+
+model Achievement {
+  id       String @id @default(uuid(7)) @db.Uuid
+  code     String @unique @db.VarChar(40) // FIRST_GAME, TEN_GAMES, IRON_MAN
+  nameI18n Json
+  descI18n Json
+  icon     String? @db.VarChar(40)
+  tier     Int     @default(1)
+  isActive Boolean @default(true)
+
+  users UserAchievement[]
+
+  @@map("achievements")
+}
+
+model UserAchievement {
+  userId        String      @db.Uuid
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String      @db.Uuid
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  earnedAt      DateTime    @default(now()) @db.Timestamptz(3)
+  context       Json? // { eventId } — за что выдано
+
+  @@id([userId, achievementId])
+  @@index([userId, earnedAt(sort: Desc)])
+  @@map("user_achievements")
+}
+
+// =============================================================================
+//  СОЦИАЛЬНЫЙ СЛОЙ
+// =============================================================================
+
+/// Подписка на игрока / клуб / площадку.
+/// Вместо полиморфизма — три nullable FK + CHECK «ровно один заполнен»,
+/// чтобы не терять ссылочную целостность.
+model Follow {
+  id         String @id @default(uuid(7)) @db.Uuid
+  followerId String @db.Uuid
+  follower   User   @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+
+  targetUserId  String? @db.Uuid
+  targetUser    User?   @relation("FollowTargetUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+  targetClubId  String? @db.Uuid
+  targetClub    Club?   @relation("FollowTargetClub", fields: [targetClubId], references: [id], onDelete: Cascade)
+  targetVenueId String? @db.Uuid
+  targetVenue   Venue?  @relation("FollowTargetVenue", fields: [targetVenueId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([followerId, targetUserId])
+  @@unique([followerId, targetClubId])
+  @@unique([followerId, targetVenueId])
+  @@index([targetUserId])
+  @@index([targetClubId])
+  @@index([targetVenueId])
+  @@map("follows")
+}
+
+model Block {
+  blockerId String   @db.Uuid
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockedId String   @db.Uuid
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  reason    String?  @db.VarChar(200)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([blockerId, blockedId])
+  @@index([blockedId])
+  @@map("blocks")
+}
+
+/// Лента. Фаза 2 — fan-out on read (выборка по подпискам).
+/// Когда упрёмся в производительность — добавляем feed_entries с fan-out on write.
+model Activity {
+  id      String       @id @default(uuid(7)) @db.Uuid
+  actorId String       @db.Uuid
+  actor   User         @relation("ActivityActor", fields: [actorId], references: [id], onDelete: Cascade)
+  verb    ActivityVerb
+
+  eventId      String? @db.Uuid
+  event        Event?  @relation("ActivityEvent", fields: [eventId], references: [id], onDelete: Cascade)
+  clubId       String? @db.Uuid
+  club         Club?   @relation("ActivityClub", fields: [clubId], references: [id], onDelete: Cascade)
+  venueId      String? @db.Uuid
+  venue        Venue?  @relation("ActivityVenue", fields: [venueId], references: [id], onDelete: Cascade)
+  targetUserId String? @db.Uuid
+  targetUser   User?   @relation("ActivityTargetUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  audience  Visibility @default(PUBLIC)
+  payload   Json?
+  createdAt DateTime   @default(now()) @db.Timestamptz(3)
+
+  @@index([actorId, createdAt(sort: Desc)])
+  @@index([audience, createdAt(sort: Desc)])
+  @@index([clubId, createdAt(sort: Desc)])
+  @@map("activities")
+}
+
+// =============================================================================
+//  ПЛАТЕЖИ
+// =============================================================================
+
+model Payment {
+  id String @id @default(uuid(7)) @db.Uuid
+
+  eventId       String?           @db.Uuid
+  event         Event?            @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  participantId String?           @db.Uuid
+  participant   EventParticipant? @relation(fields: [participantId], references: [id], onDelete: SetNull)
+  clubId        String?           @db.Uuid
+  club          Club?             @relation(fields: [clubId], references: [id], onDelete: SetNull)
+
+  payerId String @db.Uuid
+  payer   User   @relation("Payer", fields: [payerId], references: [id], onDelete: Restrict)
+
+  amount   Decimal       @db.Decimal(10, 2)
+  currency String        @default("AZN") @db.Char(3)
+  method   PaymentMethod @default(CASH)
+  status   PaymentStatus @default(PENDING)
+
+  provider   String? @db.VarChar(40) // epoint, payriff, stripe
+  externalId String? @db.VarChar(120)
+
+  dueAt         DateTime? @db.Timestamptz(3)
+  paidAt        DateTime? @db.Timestamptz(3)
+  confirmedById String?   @db.Uuid
+  confirmedBy   User?     @relation("PaymentConfirmer", fields: [confirmedById], references: [id], onDelete: SetNull)
+  note          String?   @db.VarChar(300)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(3)
+
+  @@unique([provider, externalId])
+  @@index([eventId, status])
+  @@index([payerId, status])
+  @@index([clubId, createdAt(sort: Desc)])
+  @@map("payments")
+}
+
+// =============================================================================
+//  УВЕДОМЛЕНИЯ
+// =============================================================================
+
+model Notification {
+  id      String              @id @default(uuid(7)) @db.Uuid
+  userId  String              @db.Uuid
+  user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type    NotificationType
+  channel NotificationChannel
+  status  DeliveryStatus      @default(QUEUED)
+
+  title String? @db.VarChar(200)
+  body  String? @db.VarChar(1000)
+  data  Json? // { eventId, clubId, deepLink }
+
+  /// Дедупликация: один и тот же повод не шлём дважды.
+  /// Напр. "EVENT_REMINDER_24H:{eventId}:{userId}"
+  dedupeKey String? @db.VarChar(160)
+
+  scheduledFor DateTime? @db.Timestamptz(3)
+  sentAt       DateTime? @db.Timestamptz(3)
+  readAt       DateTime? @db.Timestamptz(3)
+  error        String?   @db.VarChar(500)
+  attempts     Int       @default(0)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@unique([dedupeKey, channel])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, readAt])
+  @@index([status, scheduledFor])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  userId  String              @db.Uuid
+  user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type    NotificationType
+  channel NotificationChannel
+  enabled Boolean             @default(true)
+
+  @@id([userId, type, channel])
+  @@map("notification_preferences")
+}
+
+model DeviceToken {
+  id         String         @id @default(uuid(7)) @db.Uuid
+  userId     String         @db.Uuid
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform   DevicePlatform
+  token      String         @unique
+  locale     String?        @db.VarChar(5)
+  lastSeenAt DateTime       @default(now()) @db.Timestamptz(3)
+  createdAt  DateTime       @default(now()) @db.Timestamptz(3)
+
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+// =============================================================================
+//  МЕДИА
+// =============================================================================
+
+model MediaAsset {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  ownerId   String?   @db.Uuid
+  owner     User?     @relation("MediaOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  kind      MediaKind @default(IMAGE)
+  bucketKey String    @unique @db.VarChar(300) // ключ в R2/S3
+  mimeType  String    @db.VarChar(60)
+  sizeBytes Int
+  width     Int?
+  height    Int?
+  blurhash  String?   @db.VarChar(60)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  deletedAt DateTime? @db.Timestamptz(3)
+
+  userAvatars User[]       @relation("UserAvatar")
+  clubAvatars Club[]       @relation("ClubAvatar")
+  clubCovers  Club[]       @relation("ClubCover")
+  venuePhotos VenuePhoto[]
+
+  @@index([ownerId])
+  @@map("media_assets")
+}
+
+// =============================================================================
+//  МОДЕРАЦИЯ И СЛУЖЕБНОЕ
+// =============================================================================
+
+model Report {
+  id         String       @id @default(uuid(7)) @db.Uuid
+  reporterId String       @db.Uuid
+  reporter   User         @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reason     ReportReason
+  comment    String?      @db.VarChar(1000)
+  status     ReportStatus @default(OPEN)
+
+  targetUserId   String?      @db.Uuid
+  targetUser     User?        @relation("ReportedUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+  targetEventId  String?      @db.Uuid
+  targetEvent    Event?       @relation("ReportedEvent", fields: [targetEventId], references: [id], onDelete: Cascade)
+  targetVenueId  String?      @db.Uuid
+  targetVenue    Venue?       @relation("ReportedVenue", fields: [targetVenueId], references: [id], onDelete: Cascade)
+  targetReviewId String?      @db.Uuid
+  targetReview   VenueReview? @relation("ReportedReview", fields: [targetReviewId], references: [id], onDelete: Cascade)
+
+  resolvedById String?   @db.Uuid
+  resolvedBy   User?     @relation("ReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolutionNote String? @db.VarChar(500)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  resolvedAt   DateTime? @db.Timestamptz(3)
+
+  @@index([status, createdAt])
+  @@index([reporterId])
+  @@map("reports")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  actorId    String?  @db.Uuid
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action     String   @db.VarChar(60) // event.cancel, club.member.ban
+  entityType String   @db.VarChar(40)
+  entityId   String   @db.VarChar(64)
+  before     Json?
+  after      Json?
+  ip         String?  @db.Inet
+  userAgent  String?
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([entityType, entityId, createdAt(sort: Desc)])
+  @@index([actorId, createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
+
+/// Transactional outbox: доменное событие пишется в одной транзакции с
+/// изменением данных, релей отдаёт его в BullMQ. Гарантия at-least-once
+/// без распределённых транзакций — и точка разреза монолита в будущем.
+model OutboxEvent {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  aggregateType String    @db.VarChar(40) // Event, Club, User
+  aggregateId   String    @db.VarChar(64)
+  type          String    @db.VarChar(60) // event.participant.joined
+  payload       Json
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+  processedAt   DateTime? @db.Timestamptz(3)
+  attempts      Int       @default(0)
+  lastError     String?   @db.VarChar(500)
+
+  @@index([processedAt, createdAt])
+  @@map("outbox_events")
+}
+
+/// Идемпотентность мутирующих HTTP-запросов (двойной тап в TG WebApp,
+/// ретраи бота). Клиент шлёт Idempotency-Key.
+model IdempotencyKey {
+  key          String   @id @db.VarChar(80)
+  userId       String?  @db.Uuid
+  endpoint     String   @db.VarChar(120)
+  requestHash  String   @db.Char(64)
+  responseBody Json?
+  statusCode   Int?
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  expiresAt    DateTime @db.Timestamptz(3)
+
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}

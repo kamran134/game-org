@@ -1,0 +1,35 @@
+# === .NET ===
+bin/
+obj/
+*.user
+.vs/
+[Dd]ebug/
+[Rr]elease/
+*.dll
+*.pdb
+
+# === Node / Next.js ===
+node_modules/
+.next/
+out/
+npm-debug.log*
+.turbo/
+
+# === Env & secrets ===
+.env
+.env.*
+!.env.example
+
+# === OS / editors ===
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# === Logs ===
+*.log
+logs/
+
+# === Generated API client (regenerate via npm run gen:api, don't commit drift) ===
+# оставляем в репозитории закоммиченным для CI без .NET — не игнорируем
