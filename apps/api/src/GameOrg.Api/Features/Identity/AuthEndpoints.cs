@@ -1,13 +1,6 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using GameOrg.Infrastructure;
-using Microsoft.EntityFrameworkCore;
-
 namespace GameOrg.Api.Features.Identity;
 
 public sealed record AuthResponseDto(Guid UserId, string Handle, string DisplayName);
-
-public sealed record MeDto(Guid Id, string Handle, string DisplayName, string Locale);
 
 public static class AuthEndpoints
 {
@@ -57,24 +50,6 @@ public static class AuthEndpoints
         })
         .WithName("AuthLogout")
         .WithTags("Auth");
-
-        app.MapGet("/api/me", async (ClaimsPrincipal principal, GameOrgDbContext db, CancellationToken ct) =>
-        {
-            var sub = principal.FindFirstValue(JwtRegisteredClaimNames.Sub);
-            if (sub is null || !Guid.TryParse(sub, out var userId))
-                return Results.Unauthorized();
-
-            var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId && u.DeletedAt == null, ct);
-
-            return user is null
-                ? Results.Unauthorized()
-                : Results.Ok(new MeDto(user.Id, user.Handle, user.DisplayName, user.Locale));
-        })
-        .WithName("Me")
-        .WithTags("Auth")
-        .RequireAuthorization()
-        .Produces<MeDto>()
-        .Produces(StatusCodes.Status401Unauthorized);
 
         return app;
     }

@@ -1,8 +1,10 @@
 using System.Reflection;
 using System.Text;
+using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using GameOrg.Api.Features.Geography;
 using GameOrg.Api.Features.Identity;
+using GameOrg.Api.Features.Profiles;
 using GameOrg.Api.Features.Sports;
 using GameOrg.Api.Features.Venues;
 using GameOrg.Infrastructure;
@@ -24,6 +26,11 @@ Log.Logger = loggerConfig.CreateLogger();
 builder.Host.UseSerilog();
 
 builder.Services.AddOpenApi();
+
+// До Шага 6 в ответах API не было ни одного enum-поля — без этого
+// Gender/SkillLevel/Footedness/Visibility ушли бы в JSON как голые числа.
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder.Services.AddDbContext<GameOrgDbContext>(options => options
     .UseNpgsql(
@@ -62,6 +69,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddScoped<IdentityService>();
 builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<ProfileService>();
 
 // JWT читается либо из Authorization-заголовка (на будущее — mobile), либо из
 // httpOnly cookie go_access (веб). Имя signing key совпадает с TokenService —
@@ -134,6 +142,7 @@ app.MapGet("/health", () => Results.Ok(new
 }));
 
 app.MapAuthEndpoints();
+app.MapProfileEndpoints();
 app.MapSportsEndpoints();
 app.MapCitiesEndpoints();
 app.MapVenuesEndpoints();

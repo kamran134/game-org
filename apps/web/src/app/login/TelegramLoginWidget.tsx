@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { fetchMe, loginWithTelegram, type MeUser } from "@/lib/authApi";
+import { useRouter } from "next/navigation";
+import { fetchMe, loginWithTelegram, type MeProfile } from "@/lib/authApi";
 
 type TelegramWidgetUser = {
   id: number;
@@ -20,23 +21,27 @@ declare global {
 }
 
 export function TelegramLoginWidget({ apiUrl, botUsername }: { apiUrl: string; botUsername: string }) {
+  const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
-  const [me, setMe] = useState<MeUser | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Уже залогинен — сразу на /me, виджет не нужен.
   useEffect(() => {
     fetchMe(apiUrl)
-      .then(setMe)
-      .catch(() => {});
-  }, [apiUrl]);
+      .then((profile: MeProfile | null) => {
+        if (profile) router.push("/me");
+        else setCheckingSession(false);
+      })
+      .catch(() => setCheckingSession(false));
+  }, [apiUrl, router]);
 
   useEffect(() => {
-    if (me || !containerRef.current) return;
+    if (checkingSession || !containerRef.current) return;
 
     window.onTelegramAuth = (user) => {
       loginWithTelegram(apiUrl, user)
-        .then(() => fetchMe(apiUrl))
-        .then(setMe)
+        .then(() => router.push("/me"))
         .catch((err) => setError(err instanceof Error ? err.message : "Не удалось войти"));
     };
 
@@ -55,15 +60,9 @@ export function TelegramLoginWidget({ apiUrl, botUsername }: { apiUrl: string; b
     return () => {
       window.onTelegramAuth = undefined;
     };
-  }, [apiUrl, botUsername, me]);
+  }, [apiUrl, botUsername, checkingSession, router]);
 
-  if (me) {
-    return (
-      <p>
-        Вы вошли как {me.displayName} (@{me.handle}).
-      </p>
-    );
-  }
+  if (checkingSession) return null;
 
   return (
     <div className="flex flex-col items-center gap-3">
