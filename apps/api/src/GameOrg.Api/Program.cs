@@ -1,11 +1,15 @@
 using System.Reflection;
+using System.Text;
 using System.Threading.RateLimiting;
 using GameOrg.Api.Features.Geography;
+using GameOrg.Api.Features.Identity;
 using GameOrg.Api.Features.Sports;
 using GameOrg.Api.Features.Venues;
 using GameOrg.Infrastructure;
 using GameOrg.Infrastructure.Seed;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -44,14 +48,52 @@ builder.Services.AddRateLimiter(options =>
 });
 
 // Только известные origin'ы из конфигурации — см. Cors:AllowedOrigins в appsettings.
+// AllowCredentials — web и api на dev/prod ходят через разные origin'ы (nginx
+// path-роутинг не защищает localhost), cookies с токенами иначе не долетят.
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Default", policy => policy
         .WithOrigins(allowedOrigins)
         .AllowAnyHeader()
-        .AllowAnyMethod());
+        .AllowAnyMethod()
+        .AllowCredentials());
 });
+
+builder.Services.AddScoped<IdentityService>();
+builder.Services.AddScoped<TokenService>();
+
+// JWT читается либо из Authorization-заголовка (на будущее — mobile), либо из
+// httpOnly cookie go_access (веб). Имя signing key совпадает с TokenService —
+// см. TokenService.CreateAccessToken.
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidIssuer = TokenService.Issuer,
+            ValidAudience = TokenService.Audience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
+                builder.Configuration["JWT_SIGNING_KEY"]
+                ?? throw new InvalidOperationException("JWT_SIGNING_KEY не задан."))),
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ClockSkew = TimeSpan.FromSeconds(30),
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                if (context.Request.Cookies.TryGetValue("go_access", out var token) && !string.IsNullOrEmpty(token))
+                    context.Token = token;
+                return Task.CompletedTask;
+            },
+        };
+    });
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
@@ -80,6 +122,8 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 app.UseCors("Default");
 app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
 
 var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown";
 app.MapGet("/health", () => Results.Ok(new
@@ -89,6 +133,7 @@ app.MapGet("/health", () => Results.Ok(new
     env = app.Environment.EnvironmentName,
 }));
 
+app.MapAuthEndpoints();
 app.MapSportsEndpoints();
 app.MapCitiesEndpoints();
 app.MapVenuesEndpoints();

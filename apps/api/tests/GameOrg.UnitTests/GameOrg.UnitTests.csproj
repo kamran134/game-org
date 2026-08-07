@@ -21,6 +21,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\GameOrg.Domain\GameOrg.Domain.csproj" />
     <ProjectReference Include="..\..\src\GameOrg.Infrastructure\GameOrg.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\GameOrg.Api\GameOrg.Api.csproj" />
   </ItemGroup>
 
 </Project>
