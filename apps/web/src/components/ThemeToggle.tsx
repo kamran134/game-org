@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "@phosphor-icons/react";
+import { usePathname } from "@/i18n/navigation";
 
 // data-theme стоит на <html> только после ручного выбора (см.
 // THEME_INIT_SCRIPT в layout) — пока его нет, реальная тема идёт от
@@ -18,10 +19,20 @@ export function ThemeToggle() {
   // До монтирования не знаем эффективную тему — рендерим пусто, чтобы не
   // мигать не тем значком.
   const [theme, setTheme] = useState<"light" | "dark" | null>(null);
+  const pathname = usePathname();
 
+  // THEME_INIT_SCRIPT в layout ставит data-theme только один раз, до первой
+  // гидратации. При смене локали (LocaleSwitcher) [locale]/layout.tsx —
+  // корневой (нет обычного app/layout.tsx над ним), и переход между
+  // локалями пересоздаёт <html> без этого атрибута — он тихо пропадает, и
+  // CSS откатывается на светлые значения из :root. pathname меняется при
+  // любой навигации, включая смену локали, — переустанавливаем атрибут
+  // каждый раз, а не только один раз при монтировании.
   useEffect(() => {
-    setTheme(getEffectiveTheme());
-  }, []);
+    const t = getEffectiveTheme();
+    document.documentElement.dataset.theme = t;
+    setTheme(t);
+  }, [pathname]);
 
   function toggle() {
     const root = document.documentElement;
