@@ -5,7 +5,16 @@ import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import "../globals.css";
+
+// Блокирующий инлайн-скрипт до гидратации — ВСЕГДА проставляет data-theme
+// (сохранённый выбор или, если его ещё нет, системный prefers-color-scheme
+// через matchMedia). Без этого миг до React был бы не тем, а сам CSS
+// намеренно не использует @media (prefers-color-scheme) — см. комментарий
+// в globals.css про то, как Tailwind иначе запекает тёмное значение мимо
+// data-theme.
+const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('theme');var t=(s==='light'||s==='dark')?s:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();`;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -53,9 +62,16 @@ export default async function LocaleLayout({
 
   return (
     <html lang={locale} className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col">
         <NextIntlClientProvider>
-          <LocaleSwitcher />
+          <div className="fixed top-4 right-4 z-50 flex items-center gap-3 rounded-full border border-black/10 bg-background/80 px-3.5 py-2 shadow-sm backdrop-blur-md dark:border-white/10">
+            <LocaleSwitcher />
+            <span className="h-4 w-px bg-foreground/15" />
+            <ThemeToggle />
+          </div>
           {children}
         </NextIntlClientProvider>
       </body>

@@ -42,25 +42,44 @@
   --color-brand-border: var(--brand-border);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Намеренно без @media (prefers-color-scheme: dark) здесь: Tailwind v4
+   с @theme inline при виде такого блока запекает тёмное значение прямо в
+   сгенерированный class-selector (.bg-brand-primary и т.п.) как отдельное
+   правило под тем же media query — оно бьёт по специфичности:root[data-theme]
+   и не даёt ручному переключателю перебить системную тему. Вместо этого
+   блокирующий скрипт в layout (THEME_INIT_SCRIPT) ВСЕГДА выставляет
+   data-theme на <html> ещё до отрисовки — сам читает prefers-color-scheme
+   через matchMedia в JS, если пользователь ещё не выбирал тему руками. */
+:root[data-theme="dark"] {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --brand-primary: #ef4444;
+  --brand-primary-foreground: #ffffff;
+  --brand-secondary: #fbbf24;
+  --brand-secondary-foreground: #1a0e0e;
+  --brand-accent: #fbbf24;
+  --brand-accent-foreground: #1a0e0e;
+  --brand-background: #1a0e0e;
+  --brand-foreground: #fee2e2;
+  --brand-muted: #2a1414;
+  --brand-muted-foreground: #e7a9a9;
+  --brand-border: #3f1d1d;
+}
 
-    /* Не инверсия 1:1 — приглушённые/светлые тональные варианты того же
-       красного, как советует skill (color-dark-mode). */
-    --brand-primary: #ef4444;
-    --brand-primary-foreground: #ffffff;
-    --brand-secondary: #fbbf24;
-    --brand-secondary-foreground: #1a0e0e;
-    --brand-accent: #fbbf24;
-    --brand-accent-foreground: #1a0e0e;
-    --brand-background: #1a0e0e;
-    --brand-foreground: #fee2e2;
-    --brand-muted: #2a1414;
-    --brand-muted-foreground: #e7a9a9;
-    --brand-border: #3f1d1d;
-  }
+:root[data-theme="light"] {
+  --background: #ffffff;
+  --foreground: #171717;
+  --brand-primary: #dc2626;
+  --brand-primary-foreground: #ffffff;
+  --brand-secondary: #f59e0b;
+  --brand-secondary-foreground: #7f1d1d;
+  --brand-accent: #f59e0b;
+  --brand-accent-foreground: #7f1d1d;
+  --brand-background: #fef2f2;
+  --brand-foreground: #7f1d1d;
+  --brand-muted: #fee2e2;
+  --brand-muted-foreground: #9f5a5a;
+  --brand-border: #fecaca;
 }
 
 body {
