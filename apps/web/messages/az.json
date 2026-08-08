@@ -1,0 +1,97 @@
+{
+  "Metadata": {
+    "title": "game.org.az — Azərbaycanın idman sosial şəbəkəsi",
+    "description": "Bir neçə idman növü üçün oyunçu kartı, coğrafi axtarışlı meydançalar, açıq və qapalı oyunlar. Telegram ilə giriş."
+  },
+  "Landing": {
+    "badge": "game.org.az — Azərbaycan üçün idman sosial şəbəkəsi",
+    "heroTitleLine1": "Oyun tap.",
+    "heroTitleLine2": "Komanda topla.",
+    "heroSubtitle": "Bir neçə idman növü üçün oyunçu kartı, coğrafi axtarışlı meydançalar və oyunlar — açıq və ya yalnız özününkülər üçün. On fərqli çatda mesaj itirmədən.",
+    "ctaLogin": "Telegram ilə giriş",
+    "ctaSports": "İdman növlərinə bax",
+    "featuresHeading": "Nə var",
+    "features": {
+      "playerCard": {
+        "title": "Oyunçu kartı",
+        "description": "Oynadığın hər idman növü üçün tək profil: səviyyə, mövqelər, oyun tarixçəsi — dəvət etdiyin adam dərhal görür."
+      },
+      "venues": {
+        "title": "Yaxınlıqdakı meydançalar",
+        "description": "Coğrafi axtarışlı sahələr, zallar və kortlar — on çatda yazışmadan harada oynayacağını tap."
+      },
+      "events": {
+        "title": "Oyunlar və məşqlər",
+        "description": "İştirakçı qeydiyyatı, qonaqlar və gözləmə siyahısı ilə açıq və qapalı tədbirlər."
+      },
+      "rating": {
+        "title": "Reytinq və etibarlılıq",
+        "description": "Hər idman növü üzrə Glicko-2 reytinqi və son anda oyunu yarımçıq qoymadığın üçün etibarlılıq göstəricisi."
+      }
+    },
+    "howItWorksHeading": "Necə işləyir",
+    "steps": {
+      "login": {
+        "title": "Telegram ilə giriş edirsən",
+        "description": "Yeni parol və qeydiyyat forması yoxdur — artıq tanış olduğun tətbiqdə bir toxunuş."
+      },
+      "profile": {
+        "title": "Profilini doldurursan",
+        "description": "İdman növlərini, səviyyəni və şəhəri seçirsən — bir dəqiqədən az vaxt aparır."
+      },
+      "findGame": {
+        "title": "Oyun tapırsan",
+        "description": "Yaxın meydançalara və tədbirlərə baxırsan, qoşulursan və ya özününkünü yaradırsan."
+      }
+    },
+    "footerCtaTitle": "Oynamağa hazırsan?"
+  },
+  "Login": {
+    "title": "Telegram ilə giriş",
+    "missingBotUsername": "NEXT_PUBLIC_TELEGRAM_BOT_USERNAME təyin edilməyib.",
+    "error": "Giriş alınmadı"
+  },
+  "Me": {
+    "pageTitle": "Mənim profilim",
+    "loading": "Yüklənir…",
+    "fields": {
+      "name": "Ad",
+      "bio": "Haqqımda",
+      "city": "Şəhər",
+      "cityNotSet": "Göstərilməyib",
+      "visibility": "Profilin görünürlüyü"
+    },
+    "save": "Yadda saxla",
+    "saving": "Yadda saxlanılır…",
+    "loadError": "Profil yüklənmədi",
+    "saveError": "Profil yadda saxlanmadı",
+    "addSportError": "İdman növü əlavə edilmədi",
+    "updateSportError": "İdman növü yenilənmədi",
+    "removeSportError": "İdman növü silinmədi",
+    "mySportsHeading": "Mənim idman növlərim",
+    "noSports": "Hələ heç bir idman növü əlavə edilməyib.",
+    "remove": "Sil",
+    "addSportPlaceholder": "İdman növü əlavə et…",
+    "add": "Əlavə et",
+    "levels": {
+      "Beginner": "Başlanğıc",
+      "Amateur": "Həvəskar",
+      "Intermediate": "Orta",
+      "Advanced": "İrəliləmiş",
+      "SemiPro": "Yarımpeşəkar",
+      "Pro": "Peşəkar"
+    },
+    "visibilityOptions": {
+      "Public": "Açıq",
+      "Followers": "Yalnız izləyicilər",
+      "Private": "Gizli"
+    }
+  },
+  "Profile": {
+    "notFound": "Profil tapılmadı",
+    "descriptionFallback": "{name} oyunçusunun game.org.az-dakı profili"
+  },
+  "Sports": {
+    "pageTitle": "İdman növləri"
+  }
+}

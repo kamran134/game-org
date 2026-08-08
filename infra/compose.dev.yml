@@ -62,6 +62,7 @@ services:
       - API_URL=http://api:8080
       - NEXT_PUBLIC_API_URL=https://dev.game.org.az/api
       - NEXT_PUBLIC_TELEGRAM_BOT_USERNAME=gameorganizationbot
+      - NEXT_PUBLIC_SITE_URL=https://dev.game.org.az
       - TZ=Asia/Baku
     ports:
       - "127.0.0.1:3101:3000"

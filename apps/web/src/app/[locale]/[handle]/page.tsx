@@ -1,6 +1,9 @@
 import { cache } from "react";
 import type { Metadata } from "next";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { createApiClient } from "@/lib/apiClient";
+import { routing } from "@/i18n/routing";
+import { getPathname } from "@/i18n/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -19,35 +22,48 @@ const getProfile = cache(async (handle: string) => {
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ handle: string }>;
+  params: Promise<{ locale: string; handle: string }>;
 }): Promise<Metadata> {
-  const { handle } = await params;
+  const { locale, handle } = await params;
+  const t = await getTranslations({ locale, namespace: "Profile" });
   const profile = await getProfile(handle);
-  if (!profile) return { title: "Профиль не найден" };
+  if (!profile) return { title: t("notFound") };
 
   const title = profile.displayName ?? handle;
-  const description = profile.bio || `Профиль игрока ${title} на game.org.az`;
+  const description = profile.bio || t("descriptionFallback", { name: title });
+
+  const languages = Object.fromEntries(
+    routing.locales.map((l) => [l, getPathname({ locale: l, href: `/${handle}` })]),
+  );
 
   return {
     title,
     description,
     openGraph: { title, description, type: "profile" },
+    alternates: { languages },
   };
 }
 
-export default async function PublicProfilePage({ params }: { params: Promise<{ handle: string }> }) {
-  const { handle } = await params;
+export default async function PublicProfilePage({
+  params,
+}: {
+  params: Promise<{ locale: string; handle: string }>;
+}) {
+  const { locale, handle } = await params;
+  setRequestLocale(locale);
+  const t = await getTranslations("Profile");
+  const tLevels = await getTranslations("Me.levels");
   const profile = await getProfile(handle);
 
   if (!profile) {
     return (
       <main className="mx-auto max-w-2xl p-8">
-        <p>Профиль не найден.</p>
+        <p>{t("notFound")}.</p>
       </main>
     );
   }
 
-  const cityName = profile.city?.nameI18n?.additionalData?.ru as string | undefined;
+  const cityName = profile.city?.nameI18n?.additionalData?.[locale] as string | undefined;
 
   return (
     <main className="mx-auto max-w-2xl p-8">
@@ -63,7 +79,7 @@ export default async function PublicProfilePage({ params }: { params: Promise<{ 
               <span>
                 {s.sportEmoji} {s.sportSlug}
               </span>
-              <span className="ml-2 text-sm opacity-70">{s.level}</span>
+              <span className="ml-2 text-sm opacity-70">{s.level ? tLevels(s.level) : null}</span>
             </li>
           ))}
         </ul>

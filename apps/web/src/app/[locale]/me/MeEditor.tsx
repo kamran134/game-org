@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { useRouter } from "@/i18n/navigation";
 import {
   fetchMe,
   removeMySport,
@@ -18,6 +19,7 @@ const LEVELS: SkillLevel[] = ["Beginner", "Amateur", "Intermediate", "Advanced",
 const VISIBILITIES: Visibility[] = ["Public", "Followers", "Private"];
 
 export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: Option[]; sports: Option[] }) {
+  const t = useTranslations("Me");
   const router = useRouter();
   const [profile, setProfile] = useState<MeProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,9 +48,9 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
         setCityId(p.city?.id ?? "");
         setVisibility(p.profileVisibility);
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Не удалось загрузить профиль"))
+      .catch((err) => setError(err instanceof Error ? err.message : t("loadError")))
       .finally(() => setLoading(false));
-  }, [apiUrl, router]);
+  }, [apiUrl, router, t]);
 
   async function handleSave() {
     setSaving(true);
@@ -62,7 +64,7 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
       });
       setProfile(updated);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось сохранить профиль");
+      setError(err instanceof Error ? err.message : t("saveError"));
     } finally {
       setSaving(false);
     }
@@ -82,7 +84,7 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
       if (updated) setProfile(updated);
       setNewSportId("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось добавить вид спорта");
+      setError(err instanceof Error ? err.message : t("addSportError"));
     }
   }
 
@@ -98,7 +100,7 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
       const updated = await fetchMe(apiUrl);
       if (updated) setProfile(updated);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось обновить вид спорта");
+      setError(err instanceof Error ? err.message : t("updateSportError"));
     }
   }
 
@@ -109,11 +111,11 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
       const updated = await fetchMe(apiUrl);
       if (updated) setProfile(updated);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Не удалось удалить вид спорта");
+      setError(err instanceof Error ? err.message : t("removeSportError"));
     }
   }
 
-  if (loading) return <p>Загрузка…</p>;
+  if (loading) return <p>{t("loading")}</p>;
   if (!profile) return null;
 
   const availableSports = sports.filter((s) => !profile.sports.some((us) => us.sportId === s.id));
@@ -124,7 +126,7 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
 
       <section className="flex flex-col gap-3">
         <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium">Имя</span>
+          <span className="text-sm font-medium">{t("fields.name")}</span>
           <input
             className="rounded border border-black/10 px-3 py-2 dark:border-white/10 dark:bg-transparent"
             value={displayName}
@@ -134,7 +136,7 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium">О себе</span>
+          <span className="text-sm font-medium">{t("fields.bio")}</span>
           <textarea
             className="rounded border border-black/10 px-3 py-2 dark:border-white/10 dark:bg-transparent"
             value={bio}
@@ -145,13 +147,13 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium">Город</span>
+          <span className="text-sm font-medium">{t("fields.city")}</span>
           <select
             className="rounded border border-black/10 px-3 py-2 dark:border-white/10 dark:bg-transparent"
             value={cityId}
             onChange={(e) => setCityId(e.target.value)}
           >
-            <option value="">Не указан</option>
+            <option value="">{t("fields.cityNotSet")}</option>
             {cities.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -161,7 +163,7 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium">Видимость профиля</span>
+          <span className="text-sm font-medium">{t("fields.visibility")}</span>
           <select
             className="rounded border border-black/10 px-3 py-2 dark:border-white/10 dark:bg-transparent"
             value={visibility}
@@ -169,7 +171,7 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
           >
             {VISIBILITIES.map((v) => (
               <option key={v} value={v}>
-                {v}
+                {t(`visibilityOptions.${v}`)}
               </option>
             ))}
           </select>
@@ -180,14 +182,14 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
           onClick={handleSave}
           disabled={saving}
         >
-          {saving ? "Сохраняю…" : "Сохранить"}
+          {saving ? t("saving") : t("save")}
         </button>
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Мои виды спорта</h2>
+        <h2 className="text-lg font-semibold">{t("mySportsHeading")}</h2>
 
-        {profile.sports.length === 0 && <p className="text-sm opacity-70">Пока не добавлено ни одного вида спорта.</p>}
+        {profile.sports.length === 0 && <p className="text-sm opacity-70">{t("noSports")}</p>}
 
         <ul className="flex flex-col gap-2">
           {profile.sports.map((s) => (
@@ -205,7 +207,7 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
               >
                 {LEVELS.map((l) => (
                   <option key={l} value={l}>
-                    {l}
+                    {t(`levels.${l}`)}
                   </option>
                 ))}
               </select>
@@ -216,12 +218,12 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
               >
                 {VISIBILITIES.map((v) => (
                   <option key={v} value={v}>
-                    {v}
+                    {t(`visibilityOptions.${v}`)}
                   </option>
                 ))}
               </select>
               <button className="ml-auto text-sm text-red-600" onClick={() => handleRemoveSport(s.sportId)}>
-                Удалить
+                {t("remove")}
               </button>
             </li>
           ))}
@@ -234,7 +236,7 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
               value={newSportId}
               onChange={(e) => setNewSportId(e.target.value)}
             >
-              <option value="">Добавить вид спорта…</option>
+              <option value="">{t("addSportPlaceholder")}</option>
               {availableSports.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.emoji} {s.name}
@@ -248,7 +250,7 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
             >
               {LEVELS.map((l) => (
                 <option key={l} value={l}>
-                  {l}
+                  {t(`levels.${l}`)}
                 </option>
               ))}
             </select>
@@ -259,12 +261,12 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
             >
               {VISIBILITIES.map((v) => (
                 <option key={v} value={v}>
-                  {v}
+                  {t(`visibilityOptions.${v}`)}
                 </option>
               ))}
             </select>
             <button className="text-sm font-medium" onClick={handleAddSport} disabled={!newSportId}>
-              Добавить
+              {t("add")}
             </button>
           </div>
         )}

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { useRouter } from "@/i18n/navigation";
 import { fetchMe, loginWithTelegram, type MeProfile } from "@/lib/authApi";
 
 type TelegramWidgetUser = {
@@ -21,6 +22,7 @@ declare global {
 }
 
 export function TelegramLoginWidget({ apiUrl, botUsername }: { apiUrl: string; botUsername: string }) {
+  const t = useTranslations("Login");
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const [checkingSession, setCheckingSession] = useState(true);
@@ -42,7 +44,7 @@ export function TelegramLoginWidget({ apiUrl, botUsername }: { apiUrl: string; b
     window.onTelegramAuth = (user) => {
       loginWithTelegram(apiUrl, user)
         .then(() => router.push("/me"))
-        .catch((err) => setError(err instanceof Error ? err.message : "Не удалось войти"));
+        .catch((err) => setError(err instanceof Error ? err.message : t("error")));
     };
 
     // Виджет сам вставляет себя (iframe-кнопку) на место этого <script> —
@@ -60,7 +62,7 @@ export function TelegramLoginWidget({ apiUrl, botUsername }: { apiUrl: string; b
     return () => {
       window.onTelegramAuth = undefined;
     };
-  }, [apiUrl, botUsername, checkingSession, router]);
+  }, [apiUrl, botUsername, checkingSession, router, t]);
 
   if (checkingSession) return null;
 

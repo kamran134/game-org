@@ -44,7 +44,12 @@ public sealed partial class ProfileService(GameOrgDbContext db)
             user.Phone = request.Phone.Length == 0 ? null : request.Phone;
         }
 
-        if (request.Locale is not null) user.Locale = request.Locale;
+        if (request.Locale is not null)
+        {
+            if (!SupportedLocales.Contains(request.Locale))
+                return ("Locale должен быть az, ru или en.", false);
+            user.Locale = request.Locale;
+        }
         if (request.Timezone is not null) user.Timezone = request.Timezone;
         if (request.CityId is not null) user.CityId = request.CityId;
         if (request.ProfileVisibility is not null) user.ProfileVisibility = request.ProfileVisibility.Value;
@@ -135,4 +140,7 @@ public sealed partial class ProfileService(GameOrgDbContext db)
 
     [GeneratedRegex("^[a-z][a-z0-9_]{2,29}$")]
     private static partial Regex HandleFormat();
+
+    // Ровно три локали сайта (apps/web/messages/*.json) — см. мультиязычность az/ru/en.
+    private static readonly HashSet<string> SupportedLocales = ["az", "ru", "en"];
 }

@@ -1,0 +1,97 @@
+{
+  "Metadata": {
+    "title": "game.org.az — Sports Social Network of Azerbaijan",
+    "description": "One player card for multiple sports, venues with geo-search, public and private games. Sign in with Telegram."
+  },
+  "Landing": {
+    "badge": "game.org.az — a sports social network for Azerbaijan",
+    "heroTitleLine1": "Find a game.",
+    "heroTitleLine2": "Build a team.",
+    "heroSubtitle": "One player card for multiple sports, venues with geo-search, and games — public or just for your circle. No more messages lost in chats.",
+    "ctaLogin": "Sign in with Telegram",
+    "ctaSports": "Browse sports",
+    "featuresHeading": "What's inside",
+    "features": {
+      "playerCard": {
+        "title": "Player card",
+        "description": "One profile for every sport you play: level, positions, game history — visible right away to whoever you invite."
+      },
+      "venues": {
+        "title": "Venues nearby",
+        "description": "Fields, halls and courts with geo-search — find where to play without ten different chats."
+      },
+      "events": {
+        "title": "Games and trainings",
+        "description": "Public and private events with participant sign-up, guests, and a waitlist."
+      },
+      "rating": {
+        "title": "Rating and reliability",
+        "description": "A Glicko-2 rating for every sport, plus a reliability score for not bailing on games last-minute."
+      }
+    },
+    "howItWorksHeading": "How it works",
+    "steps": {
+      "login": {
+        "title": "Sign in with Telegram",
+        "description": "No new passwords or sign-up forms — one tap in an app you already use."
+      },
+      "profile": {
+        "title": "Fill in your profile",
+        "description": "Pick your sports, level and city — takes less than a minute."
+      },
+      "findGame": {
+        "title": "Find a game",
+        "description": "Browse nearby venues and events, join one or create your own."
+      }
+    },
+    "footerCtaTitle": "Ready to play?"
+  },
+  "Login": {
+    "title": "Sign in with Telegram",
+    "missingBotUsername": "NEXT_PUBLIC_TELEGRAM_BOT_USERNAME is not set.",
+    "error": "Failed to sign in"
+  },
+  "Me": {
+    "pageTitle": "My profile",
+    "loading": "Loading…",
+    "fields": {
+      "name": "Name",
+      "bio": "About",
+      "city": "City",
+      "cityNotSet": "Not set",
+      "visibility": "Profile visibility"
+    },
+    "save": "Save",
+    "saving": "Saving…",
+    "loadError": "Failed to load profile",
+    "saveError": "Failed to save profile",
+    "addSportError": "Failed to add sport",
+    "updateSportError": "Failed to update sport",
+    "removeSportError": "Failed to remove sport",
+    "mySportsHeading": "My sports",
+    "noSports": "No sports added yet.",
+    "remove": "Remove",
+    "addSportPlaceholder": "Add a sport…",
+    "add": "Add",
+    "levels": {
+      "Beginner": "Beginner",
+      "Amateur": "Amateur",
+      "Intermediate": "Intermediate",
+      "Advanced": "Advanced",
+      "SemiPro": "Semi-pro",
+      "Pro": "Pro"
+    },
+    "visibilityOptions": {
+      "Public": "Public",
+      "Followers": "Followers only",
+      "Private": "Private"
+    }
+  },
+  "Profile": {
+    "notFound": "Profile not found",
+    "descriptionFallback": "{name}'s player profile on game.org.az"
+  },
+  "Sports": {
+    "pageTitle": "Sports"
+  }
+}
