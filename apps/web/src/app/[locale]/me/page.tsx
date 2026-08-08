@@ -28,9 +28,11 @@ export default async function MePage({ params }: { params: Promise<{ locale: str
   }));
 
   return (
-    <main className="mx-auto max-w-2xl p-8">
-      <h1 className="mb-6 text-2xl font-semibold">{t("pageTitle")}</h1>
-      <MeEditor apiUrl={apiUrl} cities={cityOptions} sports={sportOptions} />
+    <main className="flex-1 bg-brand-background px-6 py-16">
+      <div className="mx-auto max-w-2xl">
+        <h1 className="font-heading mb-6 text-2xl font-semibold text-foreground">{t("pageTitle")}</h1>
+        <MeEditor apiUrl={apiUrl} cities={cityOptions} sports={sportOptions} />
+      </div>
     </main>
   );
 }

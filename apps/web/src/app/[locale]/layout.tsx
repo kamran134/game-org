@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Oswald } from "next/font/google";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
@@ -16,14 +16,19 @@ import "../globals.css";
 // data-theme.
 const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('theme');var t=(s==='light'||s==='dark')?s:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();`;
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+// Спортивный/атлетический шрифтовой дуэт — единый на весь сайт (не только
+// лендинг): Barlow/Barlow Condensed кириллицу не тянут в next/font/google,
+// поэтому Oswald (заголовки) + Inter (текст), см. коммит с лендингом.
+const brandHeading = Oswald({
+  variable: "--font-brand-heading",
+  weight: ["600", "700"],
+  subsets: ["latin", "cyrillic"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+const brandSans = Inter({
+  variable: "--font-brand-sans",
+  weight: ["400", "500", "600"],
+  subsets: ["latin", "cyrillic"],
 });
 
 export function generateStaticParams() {
@@ -60,8 +65,14 @@ export default async function LocaleLayout({
   // (generateStaticParams + setRequestLocale — обязательная пара).
   setRequestLocale(locale);
 
+  // suppressHydrationWarning — THEME_INIT_SCRIPT ставит data-theme до
+  // гидратации, React об этом не знает и иначе шумит про несовпадение.
   return (
-    <html lang={locale} className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html
+      lang={locale}
+      className={`${brandHeading.variable} ${brandSans.variable} h-full antialiased`}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>

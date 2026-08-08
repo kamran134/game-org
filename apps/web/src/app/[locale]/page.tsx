@@ -1,4 +1,3 @@
-import { Inter, Oswald } from "next/font/google";
 import { getTranslations } from "next-intl/server";
 import {
   ArrowRight,
@@ -8,18 +7,6 @@ import {
   UserCircle,
 } from "@phosphor-icons/react/dist/ssr";
 import { Link } from "@/i18n/navigation";
-
-const brandHeading = Oswald({
-  variable: "--font-brand-heading",
-  weight: ["600", "700"],
-  subsets: ["latin", "cyrillic"],
-});
-
-const brandSans = Inter({
-  variable: "--font-brand-sans",
-  weight: ["400", "500", "600"],
-  subsets: ["latin", "cyrillic"],
-});
 
 const FEATURES = [
   { key: "playerCard", icon: UserCircle },
@@ -34,17 +21,14 @@ export default async function Home() {
   const t = await getTranslations("Landing");
 
   return (
-    <div className={`${brandHeading.variable} ${brandSans.variable} flex flex-1 flex-col`} style={{ fontFamily: "var(--font-brand-sans)" }}>
+    <div className="flex flex-1 flex-col">
       {/* Hero */}
       <section className="bg-brand-background dark:bg-brand-background">
         <div className="mx-auto flex max-w-5xl flex-col items-start gap-8 px-6 py-24 sm:py-32">
           <span className="rounded-full border border-brand-accent/40 bg-brand-accent/10 px-4 py-1.5 text-sm font-medium text-brand-foreground">
             {t("badge")}
           </span>
-          <h1
-            className="max-w-3xl text-5xl font-semibold leading-[1.05] tracking-tight text-brand-foreground sm:text-7xl"
-            style={{ fontFamily: "var(--font-brand-heading)" }}
-          >
+          <h1 className="font-heading max-w-3xl text-5xl font-semibold leading-[1.05] tracking-tight text-brand-foreground sm:text-7xl">
             {t("heroTitleLine1")}
             <br />
             {t("heroTitleLine2")}
@@ -75,10 +59,7 @@ export default async function Home() {
       {/* Features */}
       <section className="bg-background">
         <div className="mx-auto max-w-5xl px-6 py-24">
-          <h2
-            className="mb-12 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl"
-            style={{ fontFamily: "var(--font-brand-heading)" }}
-          >
+          <h2 className="font-heading mb-12 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
             {t("featuresHeading")}
           </h2>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -101,21 +82,13 @@ export default async function Home() {
       {/* How it works */}
       <section className="bg-brand-muted/40 dark:bg-brand-background/20">
         <div className="mx-auto max-w-5xl px-6 py-24">
-          <h2
-            className="mb-12 text-3xl font-semibold tracking-tight text-brand-foreground sm:text-4xl"
-            style={{ fontFamily: "var(--font-brand-heading)" }}
-          >
+          <h2 className="font-heading mb-12 text-3xl font-semibold tracking-tight text-brand-foreground sm:text-4xl">
             {t("howItWorksHeading")}
           </h2>
           <div className="grid grid-cols-1 gap-10 sm:grid-cols-3">
             {STEPS.map((key, index) => (
               <div key={key}>
-                <div
-                  className="mb-4 text-5xl font-bold text-brand-accent/70"
-                  style={{ fontFamily: "var(--font-brand-heading)" }}
-                >
-                  {index + 1}
-                </div>
+                <div className="font-heading mb-4 text-5xl font-bold text-brand-accent/70">{index + 1}</div>
                 <h3 className="mb-2 text-lg font-semibold text-brand-foreground">{t(`steps.${key}.title`)}</h3>
                 <p className="text-base leading-7 text-brand-foreground/70">{t(`steps.${key}.description`)}</p>
               </div>
@@ -127,10 +100,7 @@ export default async function Home() {
       {/* Footer CTA */}
       <section className="bg-brand-primary">
         <div className="mx-auto flex max-w-5xl flex-col items-start gap-6 px-6 py-20 sm:flex-row sm:items-center sm:justify-between">
-          <h2
-            className="max-w-md text-3xl font-semibold leading-tight text-brand-primary-foreground sm:text-4xl"
-            style={{ fontFamily: "var(--font-brand-heading)" }}
-          >
+          <h2 className="font-heading max-w-md text-3xl font-semibold leading-tight text-brand-primary-foreground sm:text-4xl">
             {t("footerCtaTitle")}
           </h2>
           <Link

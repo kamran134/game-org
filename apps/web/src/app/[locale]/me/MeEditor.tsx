@@ -128,7 +128,7 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium">{t("fields.name")}</span>
           <input
-            className="rounded border border-black/10 px-3 py-2 dark:border-white/10 dark:bg-transparent"
+            className="w-full rounded-xl border border-brand-border bg-background px-3 py-2 text-foreground outline-none transition-colors duration-200 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 dark:bg-brand-muted"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             maxLength={80}
@@ -138,7 +138,7 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium">{t("fields.bio")}</span>
           <textarea
-            className="rounded border border-black/10 px-3 py-2 dark:border-white/10 dark:bg-transparent"
+            className="w-full rounded-xl border border-brand-border bg-background px-3 py-2 text-foreground outline-none transition-colors duration-200 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 dark:bg-brand-muted"
             value={bio}
             onChange={(e) => setBio(e.target.value)}
             maxLength={500}
@@ -149,7 +149,7 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium">{t("fields.city")}</span>
           <select
-            className="rounded border border-black/10 px-3 py-2 dark:border-white/10 dark:bg-transparent"
+            className="w-full rounded-xl border border-brand-border bg-background px-3 py-2 text-foreground outline-none transition-colors duration-200 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 dark:bg-brand-muted"
             value={cityId}
             onChange={(e) => setCityId(e.target.value)}
           >
@@ -165,7 +165,7 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium">{t("fields.visibility")}</span>
           <select
-            className="rounded border border-black/10 px-3 py-2 dark:border-white/10 dark:bg-transparent"
+            className="w-full rounded-xl border border-brand-border bg-background px-3 py-2 text-foreground outline-none transition-colors duration-200 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 dark:bg-brand-muted"
             value={visibility}
             onChange={(e) => setVisibility(e.target.value as Visibility)}
           >
@@ -178,7 +178,7 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
         </label>
 
         <button
-          className="self-start rounded bg-black px-4 py-2 text-white disabled:opacity-50 dark:bg-white dark:text-black"
+          className="self-start rounded-full bg-brand-primary px-6 py-2.5 text-sm font-semibold text-brand-primary-foreground transition-colors duration-200 hover:bg-brand-primary/90 disabled:opacity-50 cursor-pointer"
           onClick={handleSave}
           disabled={saving}
         >
@@ -187,7 +187,7 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">{t("mySportsHeading")}</h2>
+        <h2 className="font-heading text-lg font-semibold text-foreground">{t("mySportsHeading")}</h2>
 
         {profile.sports.length === 0 && <p className="text-sm opacity-70">{t("noSports")}</p>}
 
@@ -195,13 +195,13 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
           {profile.sports.map((s) => (
             <li
               key={s.sportId}
-              className="flex flex-wrap items-center gap-3 rounded-lg border border-black/10 px-4 py-3 dark:border-white/10"
+              className="flex flex-wrap items-center gap-3 rounded-2xl border border-brand-border bg-background px-4 py-3 transition-colors duration-200 hover:border-brand-primary/40"
             >
               <span className="font-medium">
                 {s.sportEmoji} {s.sportSlug}
               </span>
               <select
-                className="rounded border border-black/10 px-2 py-1 dark:border-white/10 dark:bg-transparent"
+                className="rounded-lg border border-brand-border bg-background px-2 py-1 text-sm text-foreground outline-none transition-colors duration-200 focus:border-brand-primary dark:bg-brand-muted"
                 value={s.level}
                 onChange={(e) => handleUpdateSport(s.sportId, e.target.value as SkillLevel, s.visibility)}
               >
@@ -212,7 +212,7 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
                 ))}
               </select>
               <select
-                className="rounded border border-black/10 px-2 py-1 dark:border-white/10 dark:bg-transparent"
+                className="rounded-lg border border-brand-border bg-background px-2 py-1 text-sm text-foreground outline-none transition-colors duration-200 focus:border-brand-primary dark:bg-brand-muted"
                 value={s.visibility}
                 onChange={(e) => handleUpdateSport(s.sportId, s.level, e.target.value as Visibility)}
               >
@@ -222,7 +222,10 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
                   </option>
                 ))}
               </select>
-              <button className="ml-auto text-sm text-red-600" onClick={() => handleRemoveSport(s.sportId)}>
+              <button
+                className="ml-auto cursor-pointer text-sm text-red-600 transition-colors duration-200 hover:text-red-700"
+                onClick={() => handleRemoveSport(s.sportId)}
+              >
                 {t("remove")}
               </button>
             </li>
@@ -230,9 +233,9 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
         </ul>
 
         {availableSports.length > 0 && (
-          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-black/10 px-4 py-3 dark:border-white/10">
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-dashed border-brand-border bg-background px-4 py-3">
             <select
-              className="rounded border border-black/10 px-2 py-1 dark:border-white/10 dark:bg-transparent"
+              className="rounded-lg border border-brand-border bg-background px-2 py-1 text-sm text-foreground outline-none transition-colors duration-200 focus:border-brand-primary dark:bg-brand-muted"
               value={newSportId}
               onChange={(e) => setNewSportId(e.target.value)}
             >
@@ -244,7 +247,7 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
               ))}
             </select>
             <select
-              className="rounded border border-black/10 px-2 py-1 dark:border-white/10 dark:bg-transparent"
+              className="rounded-lg border border-brand-border bg-background px-2 py-1 text-sm text-foreground outline-none transition-colors duration-200 focus:border-brand-primary dark:bg-brand-muted"
               value={newSportLevel}
               onChange={(e) => setNewSportLevel(e.target.value as SkillLevel)}
             >
@@ -255,7 +258,7 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
               ))}
             </select>
             <select
-              className="rounded border border-black/10 px-2 py-1 dark:border-white/10 dark:bg-transparent"
+              className="rounded-lg border border-brand-border bg-background px-2 py-1 text-sm text-foreground outline-none transition-colors duration-200 focus:border-brand-primary dark:bg-brand-muted"
               value={newSportVisibility}
               onChange={(e) => setNewSportVisibility(e.target.value as Visibility)}
             >
@@ -265,7 +268,11 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
                 </option>
               ))}
             </select>
-            <button className="text-sm font-medium" onClick={handleAddSport} disabled={!newSportId}>
+            <button
+              className="cursor-pointer rounded-full bg-brand-primary px-4 py-1.5 text-sm font-semibold text-brand-primary-foreground transition-colors duration-200 hover:bg-brand-primary/90 disabled:opacity-50"
+              onClick={handleAddSport}
+              disabled={!newSportId}
+            >
               {t("add")}
             </button>
           </div>
