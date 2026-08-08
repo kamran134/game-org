@@ -9,6 +9,7 @@ using GameOrg.Api.Features.Sports;
 using GameOrg.Api.Features.Venues;
 using GameOrg.Infrastructure;
 using GameOrg.Infrastructure.Seed;
+using GameOrg.Infrastructure.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -70,6 +71,8 @@ builder.Services.AddCors(options =>
 builder.Services.AddScoped<IdentityService>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<ProfileService>();
+builder.Services.AddSingleton<R2StorageService>();
+builder.Services.AddScoped<VenueService>();
 
 // JWT читается либо из Authorization-заголовка (на будущее — mobile), либо из
 // httpOnly cookie go_access (веб). Имя signing key совпадает с TokenService —
