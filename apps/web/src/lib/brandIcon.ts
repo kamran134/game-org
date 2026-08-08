@@ -1,0 +1,6 @@
+// Тот же бейдж, что в app/icon.svg (вариант B) — закодирован как data: URI,
+// чтобы ImageResponse (apple-icon.tsx, [locale]/opengraph-image.tsx) мог
+// растеризовать его через resvg вместо того, чтобы пересобирать фигуры
+// вручную из div/svg-примитивов Satori.
+export const BADGE_SVG_DATA_URI =
+  "data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMTIwIDEyMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSI2MCIgY3k9IjYwIiByPSI1NCIgZmlsbD0iI2RjMjYyNiIgc3Ryb2tlPSIjZjU5ZTBiIiBzdHJva2Utd2lkdGg9IjYiLz48Y2lyY2xlIGN4PSI2MCIgY3k9IjYwIiByPSI0NiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZjU5ZTBiIiBzdHJva2Utd2lkdGg9IjEuNSIgb3BhY2l0eT0iMC42Ii8+PGNpcmNsZSBjeD0iNjAiIGN5PSI2MiIgcj0iMjciIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZjdlZCIgc3Ryb2tlLXdpZHRoPSIxMyIvPjxwYXRoIGQ9Ik02MCw2MiBMOTQuMjQsNTAuODggQTM2LDM2IDAgMCAxIDg3LjU4LDg1LjE0IFoiIGZpbGw9IiNkYzI2MjYiLz48cmVjdCB4PSI4MC41MCIgeT0iNTUuNTAiIHdpZHRoPSIxNy4wMCIgaGVpZ2h0PSIxMyIgZmlsbD0iI2ZmZjdlZCIvPjwvc3ZnPg==";
