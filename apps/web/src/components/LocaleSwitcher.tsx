@@ -16,10 +16,10 @@ export function LocaleSwitcher() {
   const router = useRouter();
 
   return (
-    <div className="flex items-center gap-2 text-sm font-medium">
+    <div className="fixed top-4 right-4 z-50 flex items-center gap-2 rounded-full border border-black/10 bg-background/80 px-3.5 py-2 text-sm font-medium shadow-sm backdrop-blur-md dark:border-white/10">
       {routing.locales.map((l, i) => (
         <span key={l} className="flex items-center gap-2">
-          {i > 0 && <span className="text-foreground/30">·</span>}
+          {i > 0 && <span className="text-foreground/25">·</span>}
           <button
             type="button"
             onClick={() => router.replace(pathname, { locale: l })}

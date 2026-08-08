@@ -38,7 +38,7 @@ export default async function Home() {
       {/* Hero */}
       <section className="bg-brand-background dark:bg-brand-background">
         <div className="mx-auto flex max-w-5xl flex-col items-start gap-8 px-6 py-24 sm:py-32">
-          <span className="rounded-full border border-brand-border px-4 py-1.5 text-sm font-medium text-brand-foreground">
+          <span className="rounded-full border border-brand-accent/40 bg-brand-accent/10 px-4 py-1.5 text-sm font-medium text-brand-foreground">
             {t("badge")}
           </span>
           <h1
@@ -53,7 +53,7 @@ export default async function Home() {
           <div className="flex flex-col gap-4 sm:flex-row">
             <Link
               href="/login"
-              className="group inline-flex h-14 items-center justify-center gap-2 rounded-full bg-brand-accent px-8 text-base font-semibold text-brand-accent-foreground transition-colors duration-200 hover:bg-brand-accent/90 cursor-pointer"
+              className="group inline-flex h-14 items-center justify-center gap-2 rounded-full bg-brand-primary px-8 text-base font-semibold text-brand-primary-foreground transition-colors duration-200 hover:bg-brand-primary/90 cursor-pointer"
             >
               {t("ctaLogin")}
               <ArrowRight
@@ -111,7 +111,7 @@ export default async function Home() {
             {STEPS.map((key, index) => (
               <div key={key}>
                 <div
-                  className="mb-4 text-5xl font-bold text-brand-primary/30"
+                  className="mb-4 text-5xl font-bold text-brand-accent/70"
                   style={{ fontFamily: "var(--font-brand-heading)" }}
                 >
                   {index + 1}
@@ -135,7 +135,7 @@ export default async function Home() {
           </h2>
           <Link
             href="/login"
-            className="inline-flex h-14 shrink-0 items-center justify-center gap-2 rounded-full bg-brand-accent px-8 text-base font-semibold text-brand-accent-foreground transition-colors duration-200 hover:bg-brand-accent/90 cursor-pointer"
+            className="inline-flex h-14 shrink-0 items-center justify-center gap-2 rounded-full bg-white px-8 text-base font-semibold text-brand-primary transition-colors duration-200 hover:bg-white/90 cursor-pointer"
           >
             {t("ctaLogin")}
             <ArrowRight size={20} weight="bold" />

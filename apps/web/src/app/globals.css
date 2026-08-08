@@ -4,21 +4,23 @@
   --background: #ffffff;
   --foreground: #171717;
 
-  /* Бренд-палитра game.org.az — сгенерирована skill'ом ui-ux-pro-max
-     (Community/Forum Landing, Vibrant & Block-based). Пока используется
-     только на лендинге (/) — остальные страницы на нейтральном zinc,
-     трогать не стали. */
-  --brand-primary: #7c3aed;
+  /* Бренд-палитра game.org.az — «Клуб» (ui-ux-pro-max, карточка Sports
+     Team/Club: командный красный + золото). Используется только на
+     лендинге (/) — остальные страницы на нейтральном zinc, не трогали.
+     Золото — только декоративно (бейдж, цифры шагов): сам skill при
+     генерации отказался ставить его в кнопки как акцент из-за контраста
+     ("Accent adjusted... for WCAG 3:1"), поэтому CTA везде на primary. */
+  --brand-primary: #dc2626;
   --brand-primary-foreground: #ffffff;
-  --brand-secondary: #a78bfa;
-  --brand-secondary-foreground: #2e1065;
-  --brand-accent: #16a34a;
-  --brand-accent-foreground: #ffffff;
-  --brand-background: #faf5ff;
-  --brand-foreground: #4c1d95;
-  --brand-muted: #ecebf9;
-  --brand-muted-foreground: #6d28d9;
-  --brand-border: #ddd6fe;
+  --brand-secondary: #f59e0b;
+  --brand-secondary-foreground: #7f1d1d;
+  --brand-accent: #f59e0b;
+  --brand-accent-foreground: #7f1d1d;
+  --brand-background: #fef2f2;
+  --brand-foreground: #7f1d1d;
+  --brand-muted: #fee2e2;
+  --brand-muted-foreground: #9f5a5a;
+  --brand-border: #fecaca;
 }
 
 @theme inline {
@@ -46,18 +48,18 @@
     --foreground: #ededed;
 
     /* Не инверсия 1:1 — приглушённые/светлые тональные варианты того же
-       фиолетового, как советует skill (color-dark-mode). */
-    --brand-primary: #a78bfa;
-    --brand-primary-foreground: #1e1033;
-    --brand-secondary: #7c3aed;
-    --brand-secondary-foreground: #f3e8ff;
-    --brand-accent: #22c55e;
-    --brand-accent-foreground: #052e13;
-    --brand-background: #140b24;
-    --brand-foreground: #f3e8ff;
-    --brand-muted: #241539;
-    --brand-muted-foreground: #c4b5fd;
-    --brand-border: #3b2166;
+       красного, как советует skill (color-dark-mode). */
+    --brand-primary: #ef4444;
+    --brand-primary-foreground: #ffffff;
+    --brand-secondary: #fbbf24;
+    --brand-secondary-foreground: #1a0e0e;
+    --brand-accent: #fbbf24;
+    --brand-accent-foreground: #1a0e0e;
+    --brand-background: #1a0e0e;
+    --brand-foreground: #fee2e2;
+    --brand-muted: #2a1414;
+    --brand-muted-foreground: #e7a9a9;
+    --brand-border: #3f1d1d;
   }
 }
 
