@@ -48,6 +48,8 @@
   },
   "Login": {
     "title": "Sign in with Telegram",
+    "subtitle": "Sign in with your Telegram account to add venues, leave reviews, and join games.",
+    "authorizing": "Signing in…",
     "missingBotUsername": "NEXT_PUBLIC_TELEGRAM_BOT_USERNAME is not set.",
     "error": "Failed to sign in"
   },

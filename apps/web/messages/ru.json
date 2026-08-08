@@ -48,6 +48,8 @@
   },
   "Login": {
     "title": "Вход через Telegram",
+    "subtitle": "Чтобы создавать площадки, оставлять отзывы и записываться на игры — войдите через свой аккаунт Telegram.",
+    "authorizing": "Входим…",
     "missingBotUsername": "NEXT_PUBLIC_TELEGRAM_BOT_USERNAME не задан.",
     "error": "Не удалось войти"
   },

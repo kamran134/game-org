@@ -80,6 +80,12 @@ builder.Services.AddScoped<VenueService>();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        // Без этого встроенный маппинг ASP.NET Core подменяет "sub" на
+        // ClaimTypes.NameIdentifier (длинный XML-namespace URI) — тогда
+        // principal.FindFirstValue(JwtRegisteredClaimNames.Sub) в
+        // ProfileEndpoints/VenuesEndpoints ничего не находит, даже с
+        // валидным токеном (RequireAuthorization проходит, а GetUserId — нет).
+        options.MapInboundClaims = false;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidIssuer = TokenService.Issuer,

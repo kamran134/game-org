@@ -48,6 +48,8 @@
   },
   "Login": {
     "title": "Telegram ilə giriş",
+    "subtitle": "Meydança əlavə etmək, rəy yazmaq və oyunlara yazılmaq üçün Telegram hesabınızla daxil olun.",
+    "authorizing": "Daxil olunur…",
     "missingBotUsername": "NEXT_PUBLIC_TELEGRAM_BOT_USERNAME təyin edilməyib.",
     "error": "Giriş alınmadı"
   },

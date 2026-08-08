@@ -26,6 +26,7 @@ export function TelegramLoginWidget({ apiUrl, botUsername }: { apiUrl: string; b
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [authorizing, setAuthorizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Уже залогинен — сразу на /me, виджет не нужен.
@@ -42,9 +43,13 @@ export function TelegramLoginWidget({ apiUrl, botUsername }: { apiUrl: string; b
     if (checkingSession || !containerRef.current) return;
 
     window.onTelegramAuth = (user) => {
+      setAuthorizing(true);
       loginWithTelegram(apiUrl, user)
         .then(() => router.push("/me"))
-        .catch((err) => setError(err instanceof Error ? err.message : t("error")));
+        .catch((err) => {
+          setError(err instanceof Error ? err.message : t("error"));
+          setAuthorizing(false);
+        });
     };
 
     // Виджет сам вставляет себя (iframe-кнопку) на место этого <script> —
@@ -55,6 +60,7 @@ export function TelegramLoginWidget({ apiUrl, botUsername }: { apiUrl: string; b
     script.async = true;
     script.setAttribute("data-telegram-login", botUsername);
     script.setAttribute("data-size", "large");
+    script.setAttribute("data-radius", "10");
     script.setAttribute("data-onauth", "onTelegramAuth(user)");
     script.setAttribute("data-request-access", "write");
     containerRef.current.appendChild(script);
@@ -68,7 +74,15 @@ export function TelegramLoginWidget({ apiUrl, botUsername }: { apiUrl: string; b
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <div ref={containerRef} />
+      {/* Виджет Telegram рендерит iframe с собственным (всегда светлым) фоном —
+          нейтральная белая подложка не даёт ему смотреться посторонним пятном
+          на тёмной теме сайта. Фиксированная высота — чтобы карточка не
+          дёргалась, пока скрипт telegram.org грузится и вставляет iframe. */}
+      <div
+        ref={containerRef}
+        className="flex min-h-[52px] items-center justify-center rounded-xl bg-white p-2 shadow-sm"
+      />
+      {authorizing && <p className="text-sm text-foreground/60">{t("authorizing")}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   );

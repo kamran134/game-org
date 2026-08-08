@@ -17,8 +17,9 @@ export default async function LoginPage({ params }: { params: Promise<{ locale: 
 
   return (
     <main className="flex flex-1 flex-col items-center justify-center bg-brand-background px-6 py-16">
-      <div className="flex w-full max-w-sm flex-col items-center gap-6 rounded-2xl border border-brand-border bg-background p-8 shadow-sm">
+      <div className="flex w-full max-w-sm flex-col items-center gap-3 rounded-2xl border border-brand-border bg-background p-8 text-center shadow-sm">
         <h1 className="font-heading text-2xl font-semibold text-foreground">{t("title")}</h1>
+        <p className="mb-3 text-sm text-foreground/70">{t("subtitle")}</p>
         {botUsername ? (
           <TelegramLoginWidget apiUrl={apiUrl} botUsername={botUsername} />
         ) : (
