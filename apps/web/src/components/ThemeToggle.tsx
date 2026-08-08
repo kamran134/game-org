@@ -24,10 +24,20 @@ export function ThemeToggle() {
   }, []);
 
   function toggle() {
+    const root = document.documentElement;
+    // На странице много transition-colors (кнопки, карточки, hover) — при
+    // смене темы они все разом плавно кросс-фейдятся 200мс и ощущаются как
+    // лаг вместо мгновенного отклика. На время самого переключения отключаем
+    // transition глобально, затем возвращаем — hover вне переключения темы
+    // остаётся плавным.
+    root.classList.add("theme-switching");
     const next = getEffectiveTheme() === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
+    root.dataset.theme = next;
     localStorage.setItem("theme", next);
     setTheme(next);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => root.classList.remove("theme-switching"));
+    });
   }
 
   return (

@@ -87,3 +87,11 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ThemeToggle.tsx ставит этот класс на <html> на два кадра во время смены
+   темы — без него все transition-colors по странице разом кросс-фейдятся
+   200мс и переключатель ощущается как лаг. */
+.theme-switching,
+.theme-switching * {
+  transition: none !important;
+}
