@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { List, X, MapPinLine, SoccerBall } from "@phosphor-icons/react";
+import { List, X, CalendarBlank, MapPinLine, SoccerBall } from "@phosphor-icons/react";
 import { Link } from "@/i18n/navigation";
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -33,6 +33,14 @@ export function MobileNav({ apiUrl }: { apiUrl: string }) {
       {open && (
         <div className="absolute inset-x-0 top-14 z-40 border-b border-brand-border bg-background/95 px-6 py-4 shadow-md backdrop-blur-md">
           <nav className="flex flex-col gap-4 text-sm font-medium text-foreground/80">
+            <Link
+              href="/events"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 transition-colors duration-200 hover:text-foreground"
+            >
+              <CalendarBlank size={18} weight="bold" />
+              {t("events")}
+            </Link>
             <Link
               href="/venues"
               onClick={() => setOpen(false)}

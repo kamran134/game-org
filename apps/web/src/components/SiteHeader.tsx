@@ -1,5 +1,5 @@
 import { getTranslations } from "next-intl/server";
-import { MapPinLine, SoccerBall } from "@phosphor-icons/react/dist/ssr";
+import { CalendarBlank, MapPinLine, SoccerBall } from "@phosphor-icons/react/dist/ssr";
 import { Link } from "@/i18n/navigation";
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -25,6 +25,10 @@ export async function SiteHeader() {
         </Link>
 
         <nav className="hidden items-center gap-5 text-sm font-medium text-foreground/70 sm:flex">
+          <Link href="/events" className="flex items-center gap-1.5 transition-colors duration-200 hover:text-foreground">
+            <CalendarBlank size={18} weight="bold" />
+            {t("events")}
+          </Link>
           <Link href="/venues" className="flex items-center gap-1.5 transition-colors duration-200 hover:text-foreground">
             <MapPinLine size={18} weight="bold" />
             {t("venues")}
