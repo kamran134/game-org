@@ -8,6 +8,13 @@
     "empty": "Empty",
     "atLeastOneRequired": "Fill in at least one language"
   },
+  "Nav": {
+    "venues": "Venues",
+    "sports": "Sports",
+    "myProfile": "My profile",
+    "login": "Sign in",
+    "logout": "Sign out"
+  },
   "Landing": {
     "badge": "game.org.az — a sports social network for Azerbaijan",
     "heroTitleLine1": "Find a game.",

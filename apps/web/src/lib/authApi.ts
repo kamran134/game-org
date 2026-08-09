@@ -1,4 +1,5 @@
 import type { LocalizedText } from "@/lib/localized";
+import { fetchWithRefresh } from "@/lib/fetchWithRefresh";
 
 export type AuthUser = { userId: string; handle: string; displayName: string };
 
@@ -75,7 +76,10 @@ export async function loginWithTelegram(apiUrl: string, locale: string, telegram
 }
 
 export async function fetchMe(apiUrl: string, locale: string): Promise<MeProfile | null> {
-  const res = await fetch(`${apiBase(apiUrl)}/api/me`, { credentials: "include", headers: localeHeaders(locale) });
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/me`, {
+    credentials: "include",
+    headers: localeHeaders(locale),
+  });
   if (res.status === 401) return null;
   if (!res.ok) throw new Error(`Не удалось получить профиль (${res.status})`);
   return res.json();
@@ -95,7 +99,7 @@ export type UpdateMeRequest = Partial<{
 }>;
 
 export async function updateMe(apiUrl: string, locale: string, patch: UpdateMeRequest): Promise<MeProfile> {
-  const res = await fetch(`${apiBase(apiUrl)}/api/me`, {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/me`, {
     method: "PATCH",
     credentials: "include",
     headers: localeHeaders(locale, { "Content-Type": "application/json" }),
@@ -124,7 +128,7 @@ export async function upsertMySport(
   sportId: string,
   body: UpsertUserSportRequest,
 ): Promise<UserSport> {
-  const res = await fetch(`${apiBase(apiUrl)}/api/me/sports/${sportId}`, {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/me/sports/${sportId}`, {
     method: "PUT",
     credentials: "include",
     headers: localeHeaders(locale, { "Content-Type": "application/json" }),
@@ -135,7 +139,7 @@ export async function upsertMySport(
 }
 
 export async function removeMySport(apiUrl: string, locale: string, sportId: string): Promise<void> {
-  const res = await fetch(`${apiBase(apiUrl)}/api/me/sports/${sportId}`, {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/me/sports/${sportId}`, {
     method: "DELETE",
     credentials: "include",
     headers: localeHeaders(locale),

@@ -8,6 +8,13 @@
     "empty": "Doldurulmayıb",
     "atLeastOneRequired": "Ən azı bir dili doldurun"
   },
+  "Nav": {
+    "venues": "Meydançalar",
+    "sports": "İdman növləri",
+    "myProfile": "Mənim profilim",
+    "login": "Giriş",
+    "logout": "Çıxış"
+  },
   "Landing": {
     "badge": "game.org.az — Azərbaycan üçün idman sosial şəbəkəsi",
     "heroTitleLine1": "Oyun tap.",

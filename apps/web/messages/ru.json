@@ -8,6 +8,13 @@
     "empty": "Не заполнено",
     "atLeastOneRequired": "Заполните хотя бы один язык"
   },
+  "Nav": {
+    "venues": "Площадки",
+    "sports": "Виды спорта",
+    "myProfile": "Мой профиль",
+    "login": "Войти",
+    "logout": "Выйти"
+  },
   "Landing": {
     "badge": "game.org.az — спортивная соц.сеть для Азербайджана",
     "heroTitleLine1": "Найди игру.",

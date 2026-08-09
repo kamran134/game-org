@@ -6,6 +6,7 @@
 // проекте), а не только из клиентских компонентов.
 
 import type { LocalizedText } from "@/lib/localized";
+import { fetchWithRefresh } from "@/lib/fetchWithRefresh";
 
 export type VenueSurface =
   | "NaturalGrass"
@@ -179,7 +180,7 @@ export async function getVenueReviews(
 }
 
 export async function createVenue(apiUrl: string, locale: string, body: CreateVenueRequest): Promise<VenueDetail> {
-  const res = await fetch(`${apiBase(apiUrl)}/api/venues`, {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/venues`, {
     method: "POST",
     credentials: "include",
     headers: localeHeaders(locale, { "Content-Type": "application/json" }),
@@ -190,7 +191,7 @@ export async function createVenue(apiUrl: string, locale: string, body: CreateVe
 }
 
 export async function updateVenue(apiUrl: string, locale: string, id: string, body: UpdateVenueRequest): Promise<void> {
-  const res = await fetch(`${apiBase(apiUrl)}/api/venues/${id}`, {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/venues/${id}`, {
     method: "PATCH",
     credentials: "include",
     headers: localeHeaders(locale, { "Content-Type": "application/json" }),
@@ -205,7 +206,7 @@ export async function presignVenuePhoto(
   venueId: string,
   contentType: string,
 ): Promise<PresignPhotoResponse> {
-  const res = await fetch(`${apiBase(apiUrl)}/api/venues/${venueId}/photos/presign`, {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/venues/${venueId}/photos/presign`, {
     method: "POST",
     credentials: "include",
     headers: localeHeaders(locale, { "Content-Type": "application/json" }),
@@ -227,7 +228,7 @@ export async function attachVenuePhoto(
   venueId: string,
   body: { mediaId: string; isCover?: boolean; sizeBytes?: number; width?: number; height?: number },
 ): Promise<VenuePhoto> {
-  const res = await fetch(`${apiBase(apiUrl)}/api/venues/${venueId}/photos`, {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/venues/${venueId}/photos`, {
     method: "POST",
     credentials: "include",
     headers: localeHeaders(locale, { "Content-Type": "application/json" }),
@@ -238,7 +239,7 @@ export async function attachVenuePhoto(
 }
 
 export async function removeVenuePhoto(apiUrl: string, locale: string, venueId: string, photoId: string): Promise<void> {
-  const res = await fetch(`${apiBase(apiUrl)}/api/venues/${venueId}/photos/${photoId}`, {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/venues/${venueId}/photos/${photoId}`, {
     method: "DELETE",
     credentials: "include",
     headers: localeHeaders(locale),
@@ -252,7 +253,7 @@ export async function createVenueReview(
   venueId: string,
   body: UpsertReviewRequest,
 ): Promise<VenueReview> {
-  const res = await fetch(`${apiBase(apiUrl)}/api/venues/${venueId}/reviews`, {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/venues/${venueId}/reviews`, {
     method: "POST",
     credentials: "include",
     headers: localeHeaders(locale, { "Content-Type": "application/json" }),
@@ -269,7 +270,7 @@ export async function updateVenueReview(
   reviewId: string,
   body: UpsertReviewRequest,
 ): Promise<VenueReview> {
-  const res = await fetch(`${apiBase(apiUrl)}/api/venues/${venueId}/reviews/${reviewId}`, {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/venues/${venueId}/reviews/${reviewId}`, {
     method: "PATCH",
     credentials: "include",
     headers: localeHeaders(locale, { "Content-Type": "application/json" }),
@@ -280,7 +281,7 @@ export async function updateVenueReview(
 }
 
 export async function removeVenueReview(apiUrl: string, locale: string, venueId: string, reviewId: string): Promise<void> {
-  const res = await fetch(`${apiBase(apiUrl)}/api/venues/${venueId}/reviews/${reviewId}`, {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/venues/${venueId}/reviews/${reviewId}`, {
     method: "DELETE",
     credentials: "include",
     headers: localeHeaders(locale),
