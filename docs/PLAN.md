@@ -591,9 +591,114 @@ məktəb» — азербайджанские буквы просто выпал
 
 ### Шаг 8 — События
 
-Создание, публичные/приватные, запись, гости, лист ожидания, дедлайн записи,
-отмена. Hangfire для напоминаний. Поля `Title`, `Description` — мультиязычные
-по механизму из Шага 7.5.
+Самый крупный шаг из всех: новая сущность с кучей состояний + первая фоновая
+задача в проекте. Домен уже полностью портирован с Шага 2 — таблицы `events`,
+`event_participants`, все констрейнты (`events_time_order`, `events_capacity`,
+`events_has_place`, `participants_user_xor_guest`, `participants_waitlist_order`
+и т.д.), все enum'ы (`EventType/Status/ParticipationStatus/GenderPolicy/
+CostSplit`) уже в БД и в `GameOrg.Domain`, просто ничего из этого не
+подключено ни к одному эндпоинту. `Hangfire.AspNetCore`/`Hangfire.PostgreSql`
+уже в `GameOrg.Api.csproj` (Шаг 2), но не сконфигурированы в `Program.cs`.
+
+**Разбито на 5 фаз с чёткими границами.** Каждая фаза — самостоятельный
+коммит(ы), после которого `dotnet build`/`pnpm run build` зелёные и ничего не
+полуработает. Если бюджет токенов кончится — останавливаться строго на
+границе фазы, не посередине.
+
+**Явно вне охвата Шага 8** (домен есть, эндпоинтов не будет): `EventTeam`
+(разделение на команды), `EventResult`/`MvpVote` (результаты, рейтинги
+Glicko-2) — это отдельные, ещё не запланированные шаги.
+
+**Решение пользователя:** напоминания шлёт **сам новый API** напрямую через
+Telegram Bot API (`sendMessage`), тем же `TELEGRAM_BOT_TOKEN`, который сейчас
+используется только для проверки Login Widget. Старый бот
+(`game-organization-bot`) в это не вовлечён и не трогается.
+
+#### Фаза 8.1 — Домен под мультиязычность + миграция
+
+`Event.Title`/`Description` → `TitleI18n`/`DescriptionI18n`
+(`Dictionary<string,string>?`, `TitleI18n` optional — у события заголовок
+не обязателен, в отличие от названия площадки) — механизм из Шага 7.5
+(`Localized.Resolve`, `LocalizedTextDto`, jsonb + `JsonConversions.For<>()`).
+Миграция простая (в отличие от `MultilingualUserContent` — тут поля и
+раньше были nullable, backfill без раздумий: `title_i18n = jsonb_build_object
+('az', title) WHERE title IS NOT NULL`).
+
+#### Фаза 8.2 — CRUD + запись/выход, без вейтлиста и дедлайна
+
+- `PublicId` — короткий случайный id для `/e/{PublicId}`, генератор по
+  образцу `VenueSlugGenerator` (только random, без транслитерации — это не
+  человекочитаемый слаг).
+- `EventService`/`EventsEndpoints`/`EventDtos` — по образцу `VenueService`/
+  `VenuesEndpoints`/`VenueDtos`: `EventDto` (список, резолвнутые
+  `title`/`description`), `EventDetailDto` (+ `titleI18n`/`descriptionI18n`
+  для формы редактирования), `CreateEventRequest`/`UpdateEventRequest`.
+- `GET /api/events` (фильтры: sportId, upcoming/past, cityId через Venue),
+  `GET /api/events/{publicId}`, `POST /api/events`, `PATCH /api/events/{id}`
+  (только создатель — тот же паттерн владения, что у Venue).
+- `POST /api/events/{id}/participants` (self: `{status: Confirmed|Maybe}`),
+  `DELETE /api/events/{id}/participants/me`. Гость: тот же POST, но
+  `guestName` вместо статуса, `InvitedById` = текущий юзер (по констрейнту
+  `participants_user_xor_guest` — либо `UserId`, либо `GuestName`+
+  `InvitedById`, третьего не дано).
+- Валидация как в `VenueService`: `events_has_place` (`VenueId` или
+  `CustomLocation`) и `events_club_visibility` (Club-видимость требует
+  `ClubId`) — простые проверки, до похода в БД, а не полагаться на то, что
+  Postgres вернёт constraint violation.
+
+#### Фаза 8.3 — Вейтлист, дедлайн записи, отмена
+
+- Вейтлист: `ConfirmedCount >= MaxParticipants` → новая запись уходит в
+  `Waitlisted` (если `WaitlistEnabled`), иначе 400. Приватный метод
+  `PromoteFromWaitlistAsync` (по образцу `RecomputeRatingAsync` в
+  `VenueService` — отдельный шаг после любого изменения состава): при
+  выходе/отказе Confirmed-участника первый по `WaitlistOrder` становится
+  Confirmed → пишет `Notification` (`WaitlistPromoted`).
+- `RegistrationClosesAt` считается при создании из `LockHoursBeforeStart`
+  (`StartsAt - N часов`) — не на лету при каждом запросе (комментарий в
+  домене это уже фиксирует). После дедлайна — `POST .../participants`
+  отвечает 400.
+- Отмена: `POST /api/events/{id}/cancel` (только создатель) — `Status =
+  Cancelled`, `CancelledAt`, `CancelReason`. Пишет `Notification` (
+  `EventCancelled`) на всех текущих участников и сразу отправляет
+  (см. 8.4 — тот же `TelegramSender`, что и у напоминаний, отмена не ждёт
+  расписания).
+
+#### Фаза 8.4 — Hangfire + напоминания в Telegram
+
+- `Program.cs`: `AddHangfire` на `UsePostgreSqlStorage` (та же строка
+  подключения, что и EF) + `AddHangfireServer`. Дашборд (`/hangfire`) —
+  **не открывать наружу** без авторизации (пока не решено, как её приделать
+  быстро — либо не подключать `UseHangfireDashboard` вообще на dev/prod,
+  либо за `RequireAuthorization()`, решить в моменте).
+  `AutoMigrate`/health-check паттерн не трогать.
+- `GameOrg.Infrastructure/Notifications/TelegramSender.cs` — тонкая обёртка
+  над `POST https://api.telegram.org/bot{token}/sendMessage`
+  (`chat_id` = `Account.ProviderUserId` для `Provider = Telegram`, это и
+  есть numeric telegram user id, годится как chat_id для приватного чата).
+  Failure (юзер не открывал бота / заблокировал) — не кидать исключение,
+  писать `Notification.Status = Failed` + `Error`, идти дальше. Тот же
+  сервис переиспользуется и для немедленной отправки отмены (8.3), и для
+  запланированных напоминаний — не дублировать HTTP-вызов.
+  `builder.Services.AddSingleton<R2StorageService>()` — образец для
+  регистрации (тоже "может быть не настроен, тогда просто не работает",
+  тот же `IsConfigured`-паттерн, если `TELEGRAM_BOT_TOKEN` пуст).
+- Recurring job (`RecurringJob.AddOrUpdate`, раз в 10–15 минут): выбирает
+  `Event` с `StartsAt` через ~24ч/~2ч и `Status IN (Scheduled, Confirmed)`,
+  для каждого `Confirmed`-участника с `DedupeKey =
+  "EVENT_REMINDER_24H:{eventId}:{userId}"` (уже задокументированная в
+  `Notification` дедупликация) — если такой `Notification` ещё нет, создать
+  + отправить. Идемпотентно при повторном срабатывании.
+
+#### Фаза 8.5 — Frontend
+
+`apps/web/src/lib/eventsApi.ts` (по образцу `venuesApi.ts` — locale-параметр
+у каждой функции, `Accept-Language`, `fetchWithRefresh` на авторизованных
+вызовах). Страницы: `/events` (список, фильтр по виду спорта), `/events/[publicId]`
+(детальная: место/время/участники/кнопка записи), `/events/new`,
+`/events/[publicId]/edit`. `SiteHeader`/`MobileNav` — добавить пункт
+"События" в навигацию рядом с Площадками/Видами спорта (третья ссылка,
+шапка и так уже на грани — возможно, тесно, проверить при реализации).
 
 ---
 
