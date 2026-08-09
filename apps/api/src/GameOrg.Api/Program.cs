@@ -170,10 +170,19 @@ app.MapGet("/health", () => Results.Ok(new
     env = app.Environment.EnvironmentName,
 }));
 
-RecurringJob.AddOrUpdate<EventReminderJob>(
-    "event-reminders",
-    job => job.SendDueRemindersAsync(CancellationToken.None),
-    "*/10 * * * *");
+// Статический RecurringJob.AddOrUpdate падает: JobStorage.Current
+// инициализируется не сразу после AddHangfire(...), а позже (в момент,
+// когда сам DI-контейнер резолвит связанные сервисы) — на старте его ещё
+// нет, и статический API кидает необработанное исключение, роняя весь
+// процесс. IRecurringJobManager из DI не зависит от этого глобального
+// состояния — тот же метод, но через контейнер.
+using (var recurringJobScope = app.Services.CreateScope())
+{
+    recurringJobScope.ServiceProvider.GetRequiredService<IRecurringJobManager>().AddOrUpdate<EventReminderJob>(
+        "event-reminders",
+        job => job.SendDueRemindersAsync(CancellationToken.None),
+        "*/10 * * * *");
+}
 
 app.MapAuthEndpoints();
 app.MapProfileEndpoints();
