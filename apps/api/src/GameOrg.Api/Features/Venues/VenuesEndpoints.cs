@@ -156,6 +156,26 @@ public static class VenuesEndpoints
         .Produces(StatusCodes.Status403Forbidden)
         .Produces(StatusCodes.Status404NotFound);
 
+        app.MapDelete("/api/venues/{id:guid}", async (Guid id, ClaimsPrincipal principal, VenueService venueService, CancellationToken ct) =>
+        {
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            var (ok, error) = await venueService.DeleteAsync(id, userId.Value, IsModeratorOrAdmin(principal), ct);
+            if (!ok)
+            {
+                var status = error == "Площадка не найдена." ? StatusCodes.Status404NotFound : StatusCodes.Status403Forbidden;
+                return Results.Problem(error, statusCode: status);
+            }
+
+            return Results.NoContent();
+        })
+        .WithName("DeleteVenue")
+        .WithTags("Venues")
+        .RequireAuthorization()
+        .Produces(StatusCodes.Status403Forbidden)
+        .Produces(StatusCodes.Status404NotFound);
+
         app.MapPost("/api/venues/{id:guid}/photos/presign", async (
             Guid id,
             PresignPhotoRequest request,

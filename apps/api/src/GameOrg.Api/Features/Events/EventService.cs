@@ -237,6 +237,19 @@ public sealed class EventService(GameOrgDbContext db, NotificationSender notific
         return (true, null);
     }
 
+    /// <summary>Автор или модератор. Soft-delete — DeletedAt, глобальный HasQueryFilter уже прячет такие строки из всех выдач.
+    /// Отличается от CancelAsync: cancel уведомляет участников («не состоится»), delete молча убирает мусор.</summary>
+    public async Task<(bool Ok, string? Error)> DeleteAsync(Guid eventId, Guid userId, bool isModerator, CancellationToken ct)
+    {
+        var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == eventId, ct);
+        if (ev is null) return (false, "Событие не найдено.");
+        if (ev.CreatedById != userId && !isModerator) return (false, "Удалить может только автор или модератор.");
+
+        ev.DeletedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return (true, null);
+    }
+
     private static string? CheckRegistrationOpen(Event ev)
     {
         if (ev.Status == EventStatus.Cancelled) return "Событие отменено.";

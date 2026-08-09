@@ -116,6 +116,18 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage)
     /// остальным как будто площадки не существует (404, не 403 — не
     /// подтверждаем даже сам факт существования чужого черновика).
     /// </summary>
+    /// <summary>Автор или модератор. Soft-delete — DeletedAt, глобальный HasQueryFilter уже прячет такие строки из всех выдач.</summary>
+    public async Task<(bool Ok, string? Error)> DeleteAsync(Guid venueId, Guid userId, bool isModerator, CancellationToken ct)
+    {
+        var venue = await db.Venues.FirstOrDefaultAsync(v => v.Id == venueId, ct);
+        if (venue is null) return (false, "Площадка не найдена.");
+        if (venue.CreatedById != userId && !isModerator) return (false, "Удалить может только автор или модератор.");
+
+        venue.DeletedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return (true, null);
+    }
+
     public async Task<VenueDetailDto?> GetBySlugAsync(string slug, string locale, Guid? viewerId, bool viewerIsModerator, CancellationToken ct)
     {
         var venue = await db.Venues

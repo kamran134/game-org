@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using GameOrg.Api.Common;
+using GameOrg.Domain;
 
 namespace GameOrg.Api.Features.Events;
 
@@ -190,6 +191,26 @@ public static class EventsEndpoints
         .Produces(StatusCodes.Status400BadRequest)
         .Produces(StatusCodes.Status404NotFound);
 
+        app.MapDelete("/api/events/{id:guid}", async (Guid id, ClaimsPrincipal principal, EventService eventService, CancellationToken ct) =>
+        {
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            var (ok, error) = await eventService.DeleteAsync(id, userId.Value, IsModeratorOrAdmin(principal), ct);
+            if (!ok)
+            {
+                var status = error == "Событие не найдено." ? StatusCodes.Status404NotFound : StatusCodes.Status403Forbidden;
+                return Results.Problem(error, statusCode: status);
+            }
+
+            return Results.NoContent();
+        })
+        .WithName("DeleteEvent")
+        .WithTags("Events")
+        .RequireAuthorization()
+        .Produces(StatusCodes.Status403Forbidden)
+        .Produces(StatusCodes.Status404NotFound);
+
         return app;
     }
 
@@ -198,4 +219,13 @@ public static class EventsEndpoints
         var sub = principal.FindFirstValue(JwtRegisteredClaimNames.Sub);
         return sub is not null && Guid.TryParse(sub, out var userId) ? userId : null;
     }
+
+    private static UserRole GetRole(ClaimsPrincipal principal)
+    {
+        var role = principal.FindFirstValue("role");
+        return Enum.TryParse<UserRole>(role, out var parsed) ? parsed : UserRole.User;
+    }
+
+    private static bool IsModeratorOrAdmin(ClaimsPrincipal principal) =>
+        GetRole(principal) is UserRole.Moderator or UserRole.Admin;
 }
