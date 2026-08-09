@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { fetchMe, type MeProfile } from "@/lib/authApi";
 import { createVenue, updateVenue, type CreateVenueRequest, type VenueDetail, type VenueSurface } from "@/lib/venuesApi";
+import { EMPTY_LOCALIZED_TEXT, type LocalizedText } from "@/lib/localized";
+import { I18nField } from "@/components/I18nField";
 
 type Option = { id: string; name: string };
 
@@ -37,14 +39,15 @@ export function VenueForm({
   venue?: VenueDetail;
 }) {
   const t = useTranslations("Venues");
+  const locale = useLocale();
   const router = useRouter();
 
   const [checking, setChecking] = useState(true);
   const [allowed, setAllowed] = useState(mode === "create");
 
-  const [name, setName] = useState(venue?.name ?? "");
-  const [description, setDescription] = useState(venue?.description ?? "");
-  const [address, setAddress] = useState(venue?.address ?? "");
+  const [name, setName] = useState<LocalizedText>(venue?.nameI18n ?? EMPTY_LOCALIZED_TEXT);
+  const [description, setDescription] = useState<LocalizedText>(venue?.descriptionI18n ?? EMPTY_LOCALIZED_TEXT);
+  const [address, setAddress] = useState<LocalizedText>(venue?.addressI18n ?? EMPTY_LOCALIZED_TEXT);
   const [cityId, setCityId] = useState(venue?.city?.id ?? "");
   const [lat, setLat] = useState(venue?.lat ?? 40.4093);
   const [lng, setLng] = useState(venue?.lng ?? 49.8671);
@@ -66,7 +69,7 @@ export function VenueForm({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchMe(apiUrl)
+    fetchMe(apiUrl, locale)
       .then((me: MeProfile | null) => {
         if (!me) {
           router.push("/login");
@@ -76,7 +79,7 @@ export function VenueForm({
         setChecking(false);
       })
       .catch(() => setChecking(false));
-  }, [apiUrl, mode, router, venue]);
+  }, [apiUrl, locale, mode, router, venue]);
 
   function toggleSport(id: string) {
     setSportIds((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
@@ -88,8 +91,8 @@ export function VenueForm({
     try {
       const body: CreateVenueRequest = {
         name,
-        description: description || null,
-        address: address || null,
+        description,
+        address,
         cityId: cityId || null,
         lat,
         lng,
@@ -107,10 +110,10 @@ export function VenueForm({
       };
 
       if (mode === "create") {
-        const created = await createVenue(apiUrl, body);
+        const created = await createVenue(apiUrl, locale, body);
         router.push(`/venues/${created.slug}`);
       } else if (venue) {
-        await updateVenue(apiUrl, venue.id, body);
+        await updateVenue(apiUrl, locale, venue.id, body);
         router.push(`/venues/${venue.slug}`);
       }
     } catch (err) {
@@ -125,26 +128,9 @@ export function VenueForm({
 
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-brand-border bg-background p-8">
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-foreground">{t("fields.name")}</span>
-        <input className={fieldClass} value={name} onChange={(e) => setName(e.target.value)} maxLength={120} />
-      </label>
-
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-foreground">{t("fields.description")}</span>
-        <textarea
-          className={fieldClass}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={3}
-          maxLength={2000}
-        />
-      </label>
-
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium text-foreground">{t("fields.address")}</span>
-        <input className={fieldClass} value={address} onChange={(e) => setAddress(e.target.value)} maxLength={300} />
-      </label>
+      <I18nField label={t("fields.name")} value={name} onChange={setName} maxLength={120} />
+      <I18nField label={t("fields.description")} value={description} onChange={setDescription} multiline maxLength={2000} />
+      <I18nField label={t("fields.address")} value={address} onChange={setAddress} maxLength={300} />
 
       <label className="flex flex-col gap-1">
         <span className="text-sm font-medium text-foreground">{t("fields.city")}</span>
@@ -270,7 +256,7 @@ export function VenueForm({
       <button
         type="button"
         onClick={handleSubmit}
-        disabled={saving || !name}
+        disabled={saving || (!name.az && !name.ru && !name.en)}
         className="self-start rounded-full bg-brand-primary px-6 py-2.5 text-sm font-semibold text-brand-primary-foreground transition-colors duration-200 hover:bg-brand-primary/90 disabled:opacity-50 cursor-pointer"
       >
         {saving ? (mode === "create" ? t("creating") : t("saving")) : mode === "create" ? t("create") : t("save")}

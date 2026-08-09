@@ -20,7 +20,7 @@ export default async function VenuesPage({
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5100";
 
-  const venues = await getVenues(apiUrl, {
+  const venues = await getVenues(apiUrl, locale, {
     cityId: sp.cityId,
     sportId: sp.sportId,
     lat: sp.lat ? Number(sp.lat) : undefined,

@@ -3,6 +3,11 @@
     "title": "game.org.az — Sports Social Network of Azerbaijan",
     "description": "One player card for multiple sports, venues with geo-search, public and private games. Sign in with Telegram."
   },
+  "I18nField": {
+    "filled": "Filled",
+    "empty": "Empty",
+    "atLeastOneRequired": "Fill in at least one language"
+  },
   "Landing": {
     "badge": "game.org.az — a sports social network for Azerbaijan",
     "heroTitleLine1": "Find a game.",

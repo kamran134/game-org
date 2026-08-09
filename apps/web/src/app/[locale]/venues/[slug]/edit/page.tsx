@@ -15,7 +15,7 @@ export default async function EditVenuePage({
   const t = await getTranslations("Venues");
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5100";
-  const venue = await getVenue(apiUrl, slug);
+  const venue = await getVenue(apiUrl, locale, slug);
 
   if (!venue) {
     return (

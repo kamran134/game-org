@@ -7,10 +7,12 @@ import { attachVenuePhoto, presignVenuePhoto, removeVenuePhoto, uploadToPresigne
 
 export function PhotoGallery({
   apiUrl,
+  locale,
   venueId,
   initialPhotos,
 }: {
   apiUrl: string;
+  locale: string;
   venueId: string;
   initialPhotos: VenuePhoto[];
 }) {
@@ -27,9 +29,9 @@ export function PhotoGallery({
     setUploading(true);
     setError(null);
     try {
-      const presigned = await presignVenuePhoto(apiUrl, venueId, file.type);
+      const presigned = await presignVenuePhoto(apiUrl, locale, venueId, file.type);
       await uploadToPresignedUrl(presigned.uploadUrl, file);
-      const photo = await attachVenuePhoto(apiUrl, venueId, {
+      const photo = await attachVenuePhoto(apiUrl, locale, venueId, {
         mediaId: presigned.mediaId,
         isCover: photos.length === 0,
         sizeBytes: file.size,
@@ -45,7 +47,7 @@ export function PhotoGallery({
   async function handleRemove(photoId: string) {
     setError(null);
     try {
-      await removeVenuePhoto(apiUrl, venueId, photoId);
+      await removeVenuePhoto(apiUrl, locale, venueId, photoId);
       setPhotos((prev) => prev.filter((p) => p.id !== photoId));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("photoError"));

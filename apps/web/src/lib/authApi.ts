@@ -1,3 +1,5 @@
+import type { LocalizedText } from "@/lib/localized";
+
 export type AuthUser = { userId: string; handle: string; displayName: string };
 
 export type SkillLevel = "Beginner" | "Amateur" | "Intermediate" | "Advanced" | "SemiPro" | "Pro";
@@ -36,6 +38,10 @@ export type MeProfile = {
   avatarId?: string | null;
   isVerified: boolean;
   sports: UserSport[];
+  // Резолвнутые displayName/bio выше — для отображения. Эти два — сырые
+  // словари по всем языкам, только для формы редактирования (/me).
+  displayNameI18n: LocalizedText;
+  bioI18n?: LocalizedText | null;
 };
 
 // NEXT_PUBLIC_API_URL несёт /api на dev (см. infra/compose.dev.yml), но не
@@ -45,32 +51,39 @@ function apiBase(apiUrl: string): string {
   return apiUrl.replace(/\/api\/?$/, "");
 }
 
+// Бэкенд резолвит мультиязычные поля (Venue.Name, User.DisplayName, ...) по
+// этому заголовку — без него всегда падает на дефолт сайта (az), даже если
+// пользователь сидит на /ru. См. docs/PLAN.md, Шаг 7.5.
+function localeHeaders(locale: string, extra?: Record<string, string>): Record<string, string> {
+  return { "Accept-Language": locale, ...extra };
+}
+
 async function errorMessage(res: Response, fallback: string): Promise<string> {
   const problem = await res.json().catch(() => null);
   return problem?.detail ?? fallback;
 }
 
-export async function loginWithTelegram(apiUrl: string, telegramUser: unknown): Promise<AuthUser> {
+export async function loginWithTelegram(apiUrl: string, locale: string, telegramUser: unknown): Promise<AuthUser> {
   const res = await fetch(`${apiBase(apiUrl)}/api/auth/telegram`, {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: localeHeaders(locale, { "Content-Type": "application/json" }),
     body: JSON.stringify(telegramUser),
   });
   if (!res.ok) throw new Error(`Не удалось войти через Telegram (${res.status})`);
   return res.json();
 }
 
-export async function fetchMe(apiUrl: string): Promise<MeProfile | null> {
-  const res = await fetch(`${apiBase(apiUrl)}/api/me`, { credentials: "include" });
+export async function fetchMe(apiUrl: string, locale: string): Promise<MeProfile | null> {
+  const res = await fetch(`${apiBase(apiUrl)}/api/me`, { credentials: "include", headers: localeHeaders(locale) });
   if (res.status === 401) return null;
   if (!res.ok) throw new Error(`Не удалось получить профиль (${res.status})`);
   return res.json();
 }
 
 export type UpdateMeRequest = Partial<{
-  displayName: string;
-  bio: string;
+  displayName: LocalizedText;
+  bio: LocalizedText;
   phone: string;
   locale: string;
   timezone: string;
@@ -81,11 +94,11 @@ export type UpdateMeRequest = Partial<{
   gender: Gender;
 }>;
 
-export async function updateMe(apiUrl: string, patch: UpdateMeRequest): Promise<MeProfile> {
+export async function updateMe(apiUrl: string, locale: string, patch: UpdateMeRequest): Promise<MeProfile> {
   const res = await fetch(`${apiBase(apiUrl)}/api/me`, {
     method: "PATCH",
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: localeHeaders(locale, { "Content-Type": "application/json" }),
     body: JSON.stringify(patch),
   });
   if (!res.ok) throw new Error(await errorMessage(res, `Не удалось обновить профиль (${res.status})`));
@@ -105,21 +118,27 @@ export type UpsertUserSportRequest = {
   primaryPositionId?: string | null;
 };
 
-export async function upsertMySport(apiUrl: string, sportId: string, body: UpsertUserSportRequest): Promise<UserSport> {
+export async function upsertMySport(
+  apiUrl: string,
+  locale: string,
+  sportId: string,
+  body: UpsertUserSportRequest,
+): Promise<UserSport> {
   const res = await fetch(`${apiBase(apiUrl)}/api/me/sports/${sportId}`, {
     method: "PUT",
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: localeHeaders(locale, { "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await errorMessage(res, `Не удалось сохранить вид спорта (${res.status})`));
   return res.json();
 }
 
-export async function removeMySport(apiUrl: string, sportId: string): Promise<void> {
+export async function removeMySport(apiUrl: string, locale: string, sportId: string): Promise<void> {
   const res = await fetch(`${apiBase(apiUrl)}/api/me/sports/${sportId}`, {
     method: "DELETE",
     credentials: "include",
+    headers: localeHeaders(locale),
   });
   if (!res.ok && res.status !== 404) throw new Error(`Не удалось удалить вид спорта (${res.status})`);
 }

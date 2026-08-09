@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { fetchMe, loginWithTelegram, type MeProfile } from "@/lib/authApi";
 
@@ -23,6 +23,7 @@ declare global {
 
 export function TelegramLoginWidget({ apiUrl, botUsername }: { apiUrl: string; botUsername: string }) {
   const t = useTranslations("Login");
+  const locale = useLocale();
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const [checkingSession, setCheckingSession] = useState(true);
@@ -31,20 +32,20 @@ export function TelegramLoginWidget({ apiUrl, botUsername }: { apiUrl: string; b
 
   // Уже залогинен — сразу на /me, виджет не нужен.
   useEffect(() => {
-    fetchMe(apiUrl)
+    fetchMe(apiUrl, locale)
       .then((profile: MeProfile | null) => {
         if (profile) router.push("/me");
         else setCheckingSession(false);
       })
       .catch(() => setCheckingSession(false));
-  }, [apiUrl, router]);
+  }, [apiUrl, locale, router]);
 
   useEffect(() => {
     if (checkingSession || !containerRef.current) return;
 
     window.onTelegramAuth = (user) => {
       setAuthorizing(true);
-      loginWithTelegram(apiUrl, user)
+      loginWithTelegram(apiUrl, locale, user)
         .then(() => router.push("/me"))
         .catch((err) => {
           setError(err instanceof Error ? err.message : t("error"));
@@ -68,7 +69,7 @@ export function TelegramLoginWidget({ apiUrl, botUsername }: { apiUrl: string; b
     return () => {
       window.onTelegramAuth = undefined;
     };
-  }, [apiUrl, botUsername, checkingSession, router, t]);
+  }, [apiUrl, botUsername, checkingSession, locale, router, t]);
 
   if (checkingSession) return null;
 

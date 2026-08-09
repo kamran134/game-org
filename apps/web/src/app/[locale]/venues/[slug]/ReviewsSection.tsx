@@ -8,10 +8,12 @@ import { createVenueReview, removeVenueReview, updateVenueReview, type VenueRevi
 
 export function ReviewsSection({
   apiUrl,
+  locale,
   venueId,
   initialReviews,
 }: {
   apiUrl: string;
+  locale: string;
   venueId: string;
   initialReviews: VenueReview[];
 }) {
@@ -24,10 +26,10 @@ export function ReviewsSection({
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetchMe(apiUrl)
+    fetchMe(apiUrl, locale)
       .then(setMe)
       .catch(() => {});
-  }, [apiUrl]);
+  }, [apiUrl, locale]);
 
   const myReview = me ? reviews.find((r) => r.authorId === me.id) : undefined;
 
@@ -43,8 +45,8 @@ export function ReviewsSection({
     setError(null);
     try {
       const result = myReview
-        ? await updateVenueReview(apiUrl, venueId, myReview.id, { rating, text: text || null })
-        : await createVenueReview(apiUrl, venueId, { rating, text: text || null });
+        ? await updateVenueReview(apiUrl, locale, venueId, myReview.id, { rating, text: text || null })
+        : await createVenueReview(apiUrl, locale, venueId, { rating, text: text || null });
       setReviews((prev) => [result, ...prev.filter((r) => r.id !== result.id)]);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("reviewError"));
@@ -57,7 +59,7 @@ export function ReviewsSection({
     if (!myReview) return;
     setError(null);
     try {
-      await removeVenueReview(apiUrl, venueId, myReview.id);
+      await removeVenueReview(apiUrl, locale, venueId, myReview.id);
       setReviews((prev) => prev.filter((r) => r.id !== myReview.id));
       setRating(5);
       setText("");

@@ -5,6 +5,8 @@
 // и из Server Component (страница передаёт apiUrl пропом, как везде в
 // проекте), а не только из клиентских компонентов.
 
+import type { LocalizedText } from "@/lib/localized";
+
 export type VenueSurface =
   | "NaturalGrass"
   | "ArtificialGrass"
@@ -70,6 +72,11 @@ export type VenueDetail = {
   createdById?: string | null;
   sports: VenueSportItem[];
   photos: VenuePhoto[];
+  // Резолвнутые name/description/address выше — для страницы просмотра. Эти
+  // три — сырые словари по всем языкам, только для формы редактирования.
+  nameI18n: LocalizedText;
+  descriptionI18n?: LocalizedText | null;
+  addressI18n?: LocalizedText | null;
 };
 
 export type VenueReview = {
@@ -83,9 +90,9 @@ export type VenueReview = {
 };
 
 export type CreateVenueRequest = {
-  name: string;
-  description?: string | null;
-  address?: string | null;
+  name: LocalizedText;
+  description?: LocalizedText | null;
+  address?: LocalizedText | null;
   cityId?: string | null;
   lat: number;
   lng: number;
@@ -114,6 +121,13 @@ function apiBase(apiUrl: string): string {
   return apiUrl.replace(/\/api\/?$/, "");
 }
 
+// Бэкенд резолвит мультиязычные поля (Venue.Name, отзывы автора, ...) по
+// этому заголовку — без него всегда падает на дефолт сайта (az), даже если
+// пользователь сидит на /ru. См. docs/PLAN.md, Шаг 7.5.
+function localeHeaders(locale: string, extra?: Record<string, string>): Record<string, string> {
+  return { "Accept-Language": locale, ...extra };
+}
+
 async function errorMessage(res: Response, fallback: string): Promise<string> {
   const problem = await res.json().catch(() => null);
   return problem?.detail ?? fallback;
@@ -121,6 +135,7 @@ async function errorMessage(res: Response, fallback: string): Promise<string> {
 
 export async function getVenues(
   apiUrl: string,
+  locale: string,
   params: { cityId?: string; sportId?: string; lat?: number; lng?: number; radiusKm?: number },
 ): Promise<VenueListItem[]> {
   const query = new URLSearchParams();
@@ -130,52 +145,70 @@ export async function getVenues(
   if (params.lng !== undefined) query.set("lng", String(params.lng));
   if (params.radiusKm !== undefined) query.set("radiusKm", String(params.radiusKm));
 
-  const res = await fetch(`${apiBase(apiUrl)}/api/venues?${query.toString()}`, { cache: "no-store" });
+  const res = await fetch(`${apiBase(apiUrl)}/api/venues?${query.toString()}`, {
+    cache: "no-store",
+    headers: localeHeaders(locale),
+  });
   if (!res.ok) throw new Error(`Не удалось загрузить площадки (${res.status})`);
   return res.json();
 }
 
-export async function getVenue(apiUrl: string, slug: string): Promise<VenueDetail | null> {
-  const res = await fetch(`${apiBase(apiUrl)}/api/venues/${encodeURIComponent(slug)}`, { cache: "no-store" });
+export async function getVenue(apiUrl: string, locale: string, slug: string): Promise<VenueDetail | null> {
+  const res = await fetch(`${apiBase(apiUrl)}/api/venues/${encodeURIComponent(slug)}`, {
+    cache: "no-store",
+    headers: localeHeaders(locale),
+  });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Не удалось загрузить площадку (${res.status})`);
   return res.json();
 }
 
-export async function getVenueReviews(apiUrl: string, venueId: string, skip = 0, take = 20): Promise<VenueReview[]> {
+export async function getVenueReviews(
+  apiUrl: string,
+  locale: string,
+  venueId: string,
+  skip = 0,
+  take = 20,
+): Promise<VenueReview[]> {
   const res = await fetch(`${apiBase(apiUrl)}/api/venues/${venueId}/reviews?skip=${skip}&take=${take}`, {
     cache: "no-store",
+    headers: localeHeaders(locale),
   });
   if (!res.ok) throw new Error(`Не удалось загрузить отзывы (${res.status})`);
   return res.json();
 }
 
-export async function createVenue(apiUrl: string, body: CreateVenueRequest): Promise<VenueDetail> {
+export async function createVenue(apiUrl: string, locale: string, body: CreateVenueRequest): Promise<VenueDetail> {
   const res = await fetch(`${apiBase(apiUrl)}/api/venues`, {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: localeHeaders(locale, { "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await errorMessage(res, `Не удалось создать площадку (${res.status})`));
   return res.json();
 }
 
-export async function updateVenue(apiUrl: string, id: string, body: UpdateVenueRequest): Promise<void> {
+export async function updateVenue(apiUrl: string, locale: string, id: string, body: UpdateVenueRequest): Promise<void> {
   const res = await fetch(`${apiBase(apiUrl)}/api/venues/${id}`, {
     method: "PATCH",
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: localeHeaders(locale, { "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await errorMessage(res, `Не удалось обновить площадку (${res.status})`));
 }
 
-export async function presignVenuePhoto(apiUrl: string, venueId: string, contentType: string): Promise<PresignPhotoResponse> {
+export async function presignVenuePhoto(
+  apiUrl: string,
+  locale: string,
+  venueId: string,
+  contentType: string,
+): Promise<PresignPhotoResponse> {
   const res = await fetch(`${apiBase(apiUrl)}/api/venues/${venueId}/photos/presign`, {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: localeHeaders(locale, { "Content-Type": "application/json" }),
     body: JSON.stringify({ contentType }),
   });
   if (!res.ok) throw new Error(await errorMessage(res, `Не удалось подготовить загрузку (${res.status})`));
@@ -190,32 +223,39 @@ export async function uploadToPresignedUrl(uploadUrl: string, file: File): Promi
 
 export async function attachVenuePhoto(
   apiUrl: string,
+  locale: string,
   venueId: string,
   body: { mediaId: string; isCover?: boolean; sizeBytes?: number; width?: number; height?: number },
 ): Promise<VenuePhoto> {
   const res = await fetch(`${apiBase(apiUrl)}/api/venues/${venueId}/photos`, {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: localeHeaders(locale, { "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await errorMessage(res, `Не удалось прикрепить фото (${res.status})`));
   return res.json();
 }
 
-export async function removeVenuePhoto(apiUrl: string, venueId: string, photoId: string): Promise<void> {
+export async function removeVenuePhoto(apiUrl: string, locale: string, venueId: string, photoId: string): Promise<void> {
   const res = await fetch(`${apiBase(apiUrl)}/api/venues/${venueId}/photos/${photoId}`, {
     method: "DELETE",
     credentials: "include",
+    headers: localeHeaders(locale),
   });
   if (!res.ok && res.status !== 404) throw new Error(`Не удалось удалить фото (${res.status})`);
 }
 
-export async function createVenueReview(apiUrl: string, venueId: string, body: UpsertReviewRequest): Promise<VenueReview> {
+export async function createVenueReview(
+  apiUrl: string,
+  locale: string,
+  venueId: string,
+  body: UpsertReviewRequest,
+): Promise<VenueReview> {
   const res = await fetch(`${apiBase(apiUrl)}/api/venues/${venueId}/reviews`, {
     method: "POST",
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: localeHeaders(locale, { "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await errorMessage(res, `Не удалось сохранить отзыв (${res.status})`));
@@ -224,6 +264,7 @@ export async function createVenueReview(apiUrl: string, venueId: string, body: U
 
 export async function updateVenueReview(
   apiUrl: string,
+  locale: string,
   venueId: string,
   reviewId: string,
   body: UpsertReviewRequest,
@@ -231,17 +272,18 @@ export async function updateVenueReview(
   const res = await fetch(`${apiBase(apiUrl)}/api/venues/${venueId}/reviews/${reviewId}`, {
     method: "PATCH",
     credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    headers: localeHeaders(locale, { "Content-Type": "application/json" }),
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await errorMessage(res, `Не удалось обновить отзыв (${res.status})`));
   return res.json();
 }
 
-export async function removeVenueReview(apiUrl: string, venueId: string, reviewId: string): Promise<void> {
+export async function removeVenueReview(apiUrl: string, locale: string, venueId: string, reviewId: string): Promise<void> {
   const res = await fetch(`${apiBase(apiUrl)}/api/venues/${venueId}/reviews/${reviewId}`, {
     method: "DELETE",
     credentials: "include",
+    headers: localeHeaders(locale),
   });
   if (!res.ok && res.status !== 404) throw new Error(`Не удалось удалить отзыв (${res.status})`);
 }

@@ -9,7 +9,7 @@ import { PhotoGallery } from "./PhotoGallery";
 
 export const dynamic = "force-dynamic";
 
-const getVenueCached = cache(async (apiUrl: string, slug: string) => getVenue(apiUrl, slug));
+const getVenueCached = cache(async (apiUrl: string, locale: string, slug: string) => getVenue(apiUrl, locale, slug));
 
 export async function generateMetadata({
   params,
@@ -19,7 +19,7 @@ export async function generateMetadata({
   const { locale, slug } = await params;
   const t = await getTranslations({ locale, namespace: "Venues" });
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5100";
-  const venue = await getVenueCached(apiUrl, slug);
+  const venue = await getVenueCached(apiUrl, locale, slug);
   if (!venue) return { title: t("notFound") };
 
   const description = venue.description ?? venue.address ?? venue.name;
@@ -41,7 +41,7 @@ export default async function VenuePage({ params }: { params: Promise<{ locale: 
   const t = await getTranslations("Venues");
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5100";
 
-  const venue = await getVenueCached(apiUrl, slug);
+  const venue = await getVenueCached(apiUrl, locale, slug);
 
   if (!venue) {
     return (
@@ -51,7 +51,7 @@ export default async function VenuePage({ params }: { params: Promise<{ locale: 
     );
   }
 
-  const reviews = await getVenueReviews(apiUrl, venue.id).catch(() => []);
+  const reviews = await getVenueReviews(apiUrl, locale, venue.id).catch(() => []);
 
   // schema.org — для SEO (SportsActivityLocation: имя, адрес, координаты,
   // средний рейтинг, обложка). Тот же приём с инлайн-скриптом, что и
@@ -144,8 +144,8 @@ export default async function VenuePage({ params }: { params: Promise<{ locale: 
           </Link>
         </div>
 
-        <PhotoGallery apiUrl={apiUrl} venueId={venue.id} initialPhotos={venue.photos} />
-        <ReviewsSection apiUrl={apiUrl} venueId={venue.id} initialReviews={reviews} />
+        <PhotoGallery apiUrl={apiUrl} locale={locale} venueId={venue.id} initialPhotos={venue.photos} />
+        <ReviewsSection apiUrl={apiUrl} locale={locale} venueId={venue.id} initialReviews={reviews} />
       </div>
     </main>
   );

@@ -3,6 +3,11 @@
     "title": "game.org.az — Azərbaycanın idman sosial şəbəkəsi",
     "description": "Bir neçə idman növü üçün oyunçu kartı, coğrafi axtarışlı meydançalar, açıq və qapalı oyunlar. Telegram ilə giriş."
   },
+  "I18nField": {
+    "filled": "Dolduruldu",
+    "empty": "Doldurulmayıb",
+    "atLeastOneRequired": "Ən azı bir dili doldurun"
+  },
   "Landing": {
     "badge": "game.org.az — Azərbaycan üçün idman sosial şəbəkəsi",
     "heroTitleLine1": "Oyun tap.",

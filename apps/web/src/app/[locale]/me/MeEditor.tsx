@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import {
   fetchMe,
@@ -12,6 +12,8 @@ import {
   type SkillLevel,
   type Visibility,
 } from "@/lib/authApi";
+import { EMPTY_LOCALIZED_TEXT, type LocalizedText } from "@/lib/localized";
+import { I18nField } from "@/components/I18nField";
 
 type Option = { id: string; name: string; emoji?: string };
 
@@ -20,14 +22,15 @@ const VISIBILITIES: Visibility[] = ["Public", "Followers", "Private"];
 
 export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: Option[]; sports: Option[] }) {
   const t = useTranslations("Me");
+  const locale = useLocale();
   const router = useRouter();
   const [profile, setProfile] = useState<MeProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const [displayName, setDisplayName] = useState("");
-  const [bio, setBio] = useState("");
+  const [displayName, setDisplayName] = useState<LocalizedText>(EMPTY_LOCALIZED_TEXT);
+  const [bio, setBio] = useState<LocalizedText>(EMPTY_LOCALIZED_TEXT);
   const [cityId, setCityId] = useState("");
   const [visibility, setVisibility] = useState<Visibility>("Public");
 
@@ -36,33 +39,35 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
   const [newSportVisibility, setNewSportVisibility] = useState<Visibility>("Public");
 
   useEffect(() => {
-    fetchMe(apiUrl)
+    fetchMe(apiUrl, locale)
       .then((p) => {
         if (!p) {
           router.push("/login");
           return;
         }
         setProfile(p);
-        setDisplayName(p.displayName);
-        setBio(p.bio ?? "");
+        setDisplayName(p.displayNameI18n);
+        setBio(p.bioI18n ?? EMPTY_LOCALIZED_TEXT);
         setCityId(p.city?.id ?? "");
         setVisibility(p.profileVisibility);
       })
       .catch((err) => setError(err instanceof Error ? err.message : t("loadError")))
       .finally(() => setLoading(false));
-  }, [apiUrl, router, t]);
+  }, [apiUrl, locale, router, t]);
 
   async function handleSave() {
     setSaving(true);
     setError(null);
     try {
-      const updated = await updateMe(apiUrl, {
+      const updated = await updateMe(apiUrl, locale, {
         displayName,
         bio,
         cityId: cityId || undefined,
         profileVisibility: visibility,
       });
       setProfile(updated);
+      setDisplayName(updated.displayNameI18n);
+      setBio(updated.bioI18n ?? EMPTY_LOCALIZED_TEXT);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("saveError"));
     } finally {
@@ -74,13 +79,13 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
     if (!newSportId) return;
     setError(null);
     try {
-      await upsertMySport(apiUrl, newSportId, {
+      await upsertMySport(apiUrl, locale, newSportId, {
         level: newSportLevel,
         isPrimary: false,
         visibility: newSportVisibility,
         positionIds: [],
       });
-      const updated = await fetchMe(apiUrl);
+      const updated = await fetchMe(apiUrl, locale);
       if (updated) setProfile(updated);
       setNewSportId("");
     } catch (err) {
@@ -91,13 +96,13 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
   async function handleUpdateSport(sportId: string, level: SkillLevel, sportVisibility: Visibility) {
     setError(null);
     try {
-      await upsertMySport(apiUrl, sportId, {
+      await upsertMySport(apiUrl, locale, sportId, {
         level,
         isPrimary: profile?.sports.find((s) => s.sportId === sportId)?.isPrimary ?? false,
         visibility: sportVisibility,
         positionIds: [],
       });
-      const updated = await fetchMe(apiUrl);
+      const updated = await fetchMe(apiUrl, locale);
       if (updated) setProfile(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("updateSportError"));
@@ -107,8 +112,8 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
   async function handleRemoveSport(sportId: string) {
     setError(null);
     try {
-      await removeMySport(apiUrl, sportId);
-      const updated = await fetchMe(apiUrl);
+      await removeMySport(apiUrl, locale, sportId);
+      const updated = await fetchMe(apiUrl, locale);
       if (updated) setProfile(updated);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("removeSportError"));
@@ -125,26 +130,8 @@ export function MeEditor({ apiUrl, cities, sports }: { apiUrl: string; cities: O
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <section className="flex flex-col gap-3">
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium">{t("fields.name")}</span>
-          <input
-            className="w-full rounded-xl border border-brand-border bg-background px-3 py-2 text-foreground outline-none transition-colors duration-200 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 dark:bg-brand-muted"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            maxLength={80}
-          />
-        </label>
-
-        <label className="flex flex-col gap-1">
-          <span className="text-sm font-medium">{t("fields.bio")}</span>
-          <textarea
-            className="w-full rounded-xl border border-brand-border bg-background px-3 py-2 text-foreground outline-none transition-colors duration-200 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 dark:bg-brand-muted"
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            maxLength={500}
-            rows={3}
-          />
-        </label>
+        <I18nField label={t("fields.name")} value={displayName} onChange={setDisplayName} maxLength={80} />
+        <I18nField label={t("fields.bio")} value={bio} onChange={setBio} multiline maxLength={500} />
 
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium">{t("fields.city")}</span>
