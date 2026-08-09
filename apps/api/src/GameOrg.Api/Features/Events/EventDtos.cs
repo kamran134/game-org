@@ -129,3 +129,5 @@ public sealed record CreateEventRequest(
 public sealed record JoinEventRequest(ParticipationStatus Status);
 
 public sealed record AddGuestRequest(string GuestName);
+
+public sealed record CancelEventRequest(string? Reason);

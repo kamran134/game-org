@@ -135,12 +135,17 @@ public sealed class EventService(GameOrgDbContext db)
 
         var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == eventId, ct);
         if (ev is null) return (null, "Событие не найдено.");
-        if (ev.Status == EventStatus.Cancelled) return (null, "Событие отменено.");
+
+        var openError = CheckRegistrationOpen(ev);
+        if (openError is not null) return (null, openError);
 
         var already = await db.EventParticipants.AnyAsync(p => p.EventId == eventId && p.UserId == userId, ct);
         if (already) return (null, "Вы уже записаны на это событие.");
 
-        var participant = new EventParticipant { EventId = eventId, UserId = userId, Status = request.Status };
+        var (status, waitlistOrder, capacityError) = await ResolveJoinStatusAsync(ev, request.Status, ct);
+        if (capacityError is not null) return (null, capacityError);
+
+        var participant = new EventParticipant { EventId = eventId, UserId = userId, Status = status, WaitlistOrder = waitlistOrder };
         db.EventParticipants.Add(participant);
         await db.SaveChangesAsync(ct);
         await RecomputeCountsAsync(eventId, ct);
@@ -148,7 +153,7 @@ public sealed class EventService(GameOrgDbContext db)
         var user = await db.Users.FirstAsync(u => u.Id == userId, ct);
         return (new EventParticipantDto(
             participant.Id, userId, Localized.Resolve(user.DisplayNameI18n, locale) ?? "",
-            null, participant.Status, null, participant.JoinedAt), null);
+            null, participant.Status, participant.WaitlistOrder, participant.JoinedAt), null);
     }
 
     public async Task<bool> LeaveAsync(Guid eventId, Guid userId, CancellationToken ct)
@@ -159,6 +164,11 @@ public sealed class EventService(GameOrgDbContext db)
         db.EventParticipants.Remove(participant);
         await db.SaveChangesAsync(ct);
         await RecomputeCountsAsync(eventId, ct);
+        // Освободившийся Confirmed-слот (если он был) может освободить место
+        // под первого в очереди — метод сам разбирается, есть ли вообще
+        // свободные места и очередь; безопасно звать всегда, а не только
+        // когда точно знаем, что участник был Confirmed.
+        await PromoteFromWaitlistAsync(eventId, ct);
         return true;
     }
 
@@ -168,21 +178,125 @@ public sealed class EventService(GameOrgDbContext db)
         if (string.IsNullOrWhiteSpace(request.GuestName))
             return (null, "Имя гостя обязательно.");
 
-        var eventExists = await db.Events.AnyAsync(e => e.Id == eventId, ct);
-        if (!eventExists) return (null, "Событие не найдено.");
+        var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == eventId, ct);
+        if (ev is null) return (null, "Событие не найдено.");
+
+        var openError = CheckRegistrationOpen(ev);
+        if (openError is not null) return (null, openError);
+
+        // Гость всегда "просится" как Confirmed — тот же вейтлист-конвейер,
+        // что и self-join, иначе приглашение гостя обходило бы MaxParticipants.
+        var (status, waitlistOrder, capacityError) = await ResolveJoinStatusAsync(ev, ParticipationStatus.Confirmed, ct);
+        if (capacityError is not null) return (null, capacityError);
 
         var guest = new EventParticipant
         {
             EventId = eventId,
             GuestName = request.GuestName.Trim(),
             InvitedById = invitedById,
-            Status = ParticipationStatus.Confirmed,
+            Status = status,
+            WaitlistOrder = waitlistOrder,
         };
         db.EventParticipants.Add(guest);
         await db.SaveChangesAsync(ct);
         await RecomputeCountsAsync(eventId, ct);
 
-        return (new EventParticipantDto(guest.Id, null, guest.GuestName, guest.GuestName, guest.Status, null, guest.JoinedAt), null);
+        return (new EventParticipantDto(guest.Id, null, guest.GuestName, guest.GuestName, guest.Status, guest.WaitlistOrder, guest.JoinedAt), null);
+    }
+
+    public async Task<(bool Ok, string? Error)> CancelAsync(Guid eventId, Guid userId, string? reason, CancellationToken ct)
+    {
+        var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == eventId, ct);
+        if (ev is null) return (false, "Событие не найдено.");
+        if (ev.CreatedById != userId) return (false, "Отменить может только создатель.");
+        if (ev.Status == EventStatus.Cancelled) return (false, "Событие уже отменено.");
+
+        ev.Status = EventStatus.Cancelled;
+        ev.CancelledAt = DateTime.UtcNow;
+        ev.CancelReason = string.IsNullOrWhiteSpace(reason) ? null : reason;
+        ev.UpdatedAt = DateTime.UtcNow;
+
+        // Немедленная отправка (не по расписанию, как напоминания) — сама
+        // отправка в Telegram появится в фазе 8.4 (TelegramSender), здесь
+        // только пишем очередь, дедупликация по DedupeKey не даст продублировать.
+        var participantUserIds = await db.EventParticipants
+            .Where(p => p.EventId == eventId && p.UserId != null && p.Status != ParticipationStatus.Declined)
+            .Select(p => p.UserId!.Value)
+            .ToListAsync(ct);
+
+        foreach (var participantUserId in participantUserIds)
+        {
+            db.Notifications.Add(new Notification
+            {
+                UserId = participantUserId,
+                Type = NotificationType.EventCancelled,
+                Channel = NotificationChannel.Telegram,
+                DedupeKey = $"EVENT_CANCELLED:{eventId}:{participantUserId}",
+                Data = new Dictionary<string, object> { ["eventId"] = eventId.ToString() },
+            });
+        }
+
+        await db.SaveChangesAsync(ct);
+        return (true, null);
+    }
+
+    private static string? CheckRegistrationOpen(Event ev)
+    {
+        if (ev.Status == EventStatus.Cancelled) return "Событие отменено.";
+        if (ev.RegistrationClosesAt is not null && DateTime.UtcNow > ev.RegistrationClosesAt) return "Запись на событие закрыта.";
+        return null;
+    }
+
+    /// <summary>
+    /// Maybe никогда не занимает место — вейтлист только про Confirmed.
+    /// Свободных мест нет и WaitlistEnabled — уходит в Waitlisted с
+    /// следующим WaitlistOrder (participants_waitlist_uq в БД не даст
+    /// коллизии, но мы и так считаем максимум явно, а не полагаемся на retry).
+    /// </summary>
+    private async Task<(ParticipationStatus Status, int? WaitlistOrder, string? Error)> ResolveJoinStatusAsync(
+        Event ev, ParticipationStatus requested, CancellationToken ct)
+    {
+        if (requested != ParticipationStatus.Confirmed) return (requested, null, null);
+        if (ev.MaxParticipants is null || ev.ConfirmedCount < ev.MaxParticipants) return (ParticipationStatus.Confirmed, null, null);
+        if (!ev.WaitlistEnabled) return (ParticipationStatus.Confirmed, null, "Свободных мест нет.");
+
+        var lastOrder = await db.EventParticipants
+            .Where(p => p.EventId == ev.Id && p.WaitlistOrder != null)
+            .Select(p => (int?)p.WaitlistOrder)
+            .MaxAsync(ct) ?? 0;
+        return (ParticipationStatus.Waitlisted, lastOrder + 1, null);
+    }
+
+    /// <summary>По образцу RecomputeRatingAsync в VenueService — отдельный шаг после изменения состава, не инкрементальный счётчик.</summary>
+    private async Task PromoteFromWaitlistAsync(Guid eventId, CancellationToken ct)
+    {
+        var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == eventId, ct);
+        if (ev is null || ev.MaxParticipants is null || ev.ConfirmedCount >= ev.MaxParticipants) return;
+
+        var next = await db.EventParticipants
+            .Where(p => p.EventId == eventId && p.Status == ParticipationStatus.Waitlisted)
+            .OrderBy(p => p.WaitlistOrder)
+            .FirstOrDefaultAsync(ct);
+        if (next is null) return;
+
+        next.Status = ParticipationStatus.Confirmed;
+        next.WaitlistOrder = null;
+        next.StatusChangedAt = DateTime.UtcNow;
+
+        if (next.UserId is not null)
+        {
+            db.Notifications.Add(new Notification
+            {
+                UserId = next.UserId.Value,
+                Type = NotificationType.WaitlistPromoted,
+                Channel = NotificationChannel.Telegram,
+                DedupeKey = $"WAITLIST_PROMOTED:{eventId}:{next.Id}",
+                Data = new Dictionary<string, object> { ["eventId"] = eventId.ToString() },
+            });
+        }
+
+        await db.SaveChangesAsync(ct);
+        await RecomputeCountsAsync(eventId, ct);
     }
 
     private async Task RecomputeCountsAsync(Guid eventId, CancellationToken ct)

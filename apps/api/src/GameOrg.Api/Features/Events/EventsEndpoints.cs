@@ -134,6 +134,36 @@ public static class EventsEndpoints
         .RequireAuthorization()
         .Produces(StatusCodes.Status404NotFound);
 
+        app.MapPost("/api/events/{id:guid}/cancel", async (
+            Guid id,
+            CancelEventRequest request,
+            ClaimsPrincipal principal,
+            EventService eventService,
+            CancellationToken ct) =>
+        {
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            var (ok, error) = await eventService.CancelAsync(id, userId.Value, request.Reason, ct);
+            if (!ok)
+            {
+                var status = error == "Событие не найдено."
+                    ? StatusCodes.Status404NotFound
+                    : error == "Отменить может только создатель."
+                        ? StatusCodes.Status403Forbidden
+                        : StatusCodes.Status400BadRequest;
+                return Results.Problem(error, statusCode: status);
+            }
+
+            return Results.NoContent();
+        })
+        .WithName("CancelEvent")
+        .WithTags("Events")
+        .RequireAuthorization()
+        .Produces(StatusCodes.Status400BadRequest)
+        .Produces(StatusCodes.Status403Forbidden)
+        .Produces(StatusCodes.Status404NotFound);
+
         app.MapPost("/api/events/{id:guid}/guests", async (
             Guid id,
             AddGuestRequest request,
