@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using GameOrg.Api.Features.Events;
 using GameOrg.Api.Features.Geography;
 using GameOrg.Api.Features.Identity;
 using GameOrg.Api.Features.Profiles;
@@ -73,6 +74,7 @@ builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<ProfileService>();
 builder.Services.AddSingleton<R2StorageService>();
 builder.Services.AddScoped<VenueService>();
+builder.Services.AddScoped<EventService>();
 
 // JWT читается либо из Authorization-заголовка (на будущее — mobile), либо из
 // httpOnly cookie go_access (веб). Имя signing key совпадает с TokenService —
@@ -155,6 +157,7 @@ app.MapProfileEndpoints();
 app.MapSportsEndpoints();
 app.MapCitiesEndpoints();
 app.MapVenuesEndpoints();
+app.MapEventsEndpoints();
 
 app.Run();
 
