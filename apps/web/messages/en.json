@@ -13,7 +13,9 @@
     "sports": "Sports",
     "myProfile": "My profile",
     "login": "Sign in",
-    "logout": "Sign out"
+    "logout": "Sign out",
+    "menu": "Menu",
+    "close": "Close"
   },
   "Landing": {
     "badge": "game.org.az — a sports social network for Azerbaijan",

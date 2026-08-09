@@ -13,7 +13,9 @@
     "sports": "İdman növləri",
     "myProfile": "Mənim profilim",
     "login": "Giriş",
-    "logout": "Çıxış"
+    "logout": "Çıxış",
+    "menu": "Menyu",
+    "close": "Bağla"
   },
   "Landing": {
     "badge": "game.org.az — Azərbaycan üçün idman sosial şəbəkəsi",
