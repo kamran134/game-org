@@ -9,8 +9,11 @@ using GameOrg.Api.Features.Profiles;
 using GameOrg.Api.Features.Sports;
 using GameOrg.Api.Features.Venues;
 using GameOrg.Infrastructure;
+using GameOrg.Infrastructure.Notifications;
 using GameOrg.Infrastructure.Seed;
 using GameOrg.Infrastructure.Storage;
+using Hangfire;
+using Hangfire.PostgreSql;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -75,6 +78,21 @@ builder.Services.AddScoped<ProfileService>();
 builder.Services.AddSingleton<R2StorageService>();
 builder.Services.AddScoped<VenueService>();
 builder.Services.AddScoped<EventService>();
+
+builder.Services.AddHttpClient<TelegramSender>();
+builder.Services.AddScoped<NotificationSender>();
+builder.Services.AddScoped<EventReminderJob>();
+
+// Recurring напоминания за 24ч/2ч до события (EventReminderJob) — своя
+// схема (hangfire.*) в той же Postgres, что и EF; не Redis (docs/PLAN.md §10).
+// Дашборд (/hangfire) сознательно не подключаем — нет механизма авторизации
+// для него, открывать наружу без неё нельзя.
+builder.Services.AddHangfire(config => config
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UsePostgreSqlStorage(options => options.UseNpgsqlConnection(builder.Configuration.GetConnectionString("Default"))));
+builder.Services.AddHangfireServer();
 
 // JWT читается либо из Authorization-заголовка (на будущее — mobile), либо из
 // httpOnly cookie go_access (веб). Имя signing key совпадает с TokenService —
@@ -151,6 +169,11 @@ app.MapGet("/health", () => Results.Ok(new
     version,
     env = app.Environment.EnvironmentName,
 }));
+
+RecurringJob.AddOrUpdate<EventReminderJob>(
+    "event-reminders",
+    job => job.SendDueRemindersAsync(CancellationToken.None),
+    "*/10 * * * *");
 
 app.MapAuthEndpoints();
 app.MapProfileEndpoints();

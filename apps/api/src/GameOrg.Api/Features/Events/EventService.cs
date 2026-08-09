@@ -3,16 +3,13 @@ using GameOrg.Api.Features.Sports;
 using GameOrg.Domain;
 using GameOrg.Domain.Entities;
 using GameOrg.Infrastructure;
+using GameOrg.Infrastructure.Notifications;
 using Microsoft.EntityFrameworkCore;
 
 namespace GameOrg.Api.Features.Events;
 
-/// <summary>
-/// CRUD событий и запись участников. Вейтлист/дедлайн записи/отмена —
-/// фаза 8.3 (docs/PLAN.md), здесь только базовый join/leave без ограничений
-/// по вместимости.
-/// </summary>
-public sealed class EventService(GameOrgDbContext db)
+/// <summary>CRUD событий, запись участников (с вейтлистом), отмена. Напоминания за 24ч/2ч — EventReminderJob.</summary>
+public sealed class EventService(GameOrgDbContext db, NotificationSender notificationSender)
 {
     public async Task<(Event? Result, string? Error)> CreateAsync(Guid userId, CreateEventRequest request, CancellationToken ct)
     {
@@ -216,9 +213,11 @@ public sealed class EventService(GameOrgDbContext db)
         ev.CancelReason = string.IsNullOrWhiteSpace(reason) ? null : reason;
         ev.UpdatedAt = DateTime.UtcNow;
 
-        // Немедленная отправка (не по расписанию, как напоминания) — сама
-        // отправка в Telegram появится в фазе 8.4 (TelegramSender), здесь
-        // только пишем очередь, дедупликация по DedupeKey не даст продублировать.
+        await db.SaveChangesAsync(ct);
+
+        // Немедленно (не по расписанию, как напоминания) — SendAsync сам
+        // идемпотентен по DedupeKey, повторный вызов CancelAsync (если бы
+        // он был возможен — выше уже отсечён статусом) ничего не продублирует.
         var participantUserIds = await db.EventParticipants
             .Where(p => p.EventId == eventId && p.UserId != null && p.Status != ParticipationStatus.Declined)
             .Select(p => p.UserId!.Value)
@@ -226,17 +225,15 @@ public sealed class EventService(GameOrgDbContext db)
 
         foreach (var participantUserId in participantUserIds)
         {
-            db.Notifications.Add(new Notification
-            {
-                UserId = participantUserId,
-                Type = NotificationType.EventCancelled,
-                Channel = NotificationChannel.Telegram,
-                DedupeKey = $"EVENT_CANCELLED:{eventId}:{participantUserId}",
-                Data = new Dictionary<string, object> { ["eventId"] = eventId.ToString() },
-            });
+            await notificationSender.SendAsync(
+                participantUserId,
+                NotificationType.EventCancelled,
+                $"EVENT_CANCELLED:{eventId}:{participantUserId}",
+                "Событие отменено.",
+                new Dictionary<string, object> { ["eventId"] = eventId.ToString() },
+                ct);
         }
 
-        await db.SaveChangesAsync(ct);
         return (true, null);
     }
 
@@ -282,21 +279,19 @@ public sealed class EventService(GameOrgDbContext db)
         next.Status = ParticipationStatus.Confirmed;
         next.WaitlistOrder = null;
         next.StatusChangedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        await RecomputeCountsAsync(eventId, ct);
 
         if (next.UserId is not null)
         {
-            db.Notifications.Add(new Notification
-            {
-                UserId = next.UserId.Value,
-                Type = NotificationType.WaitlistPromoted,
-                Channel = NotificationChannel.Telegram,
-                DedupeKey = $"WAITLIST_PROMOTED:{eventId}:{next.Id}",
-                Data = new Dictionary<string, object> { ["eventId"] = eventId.ToString() },
-            });
+            await notificationSender.SendAsync(
+                next.UserId.Value,
+                NotificationType.WaitlistPromoted,
+                $"WAITLIST_PROMOTED:{eventId}:{next.Id}",
+                "Освободилось место — вы переведены из листа ожидания в участники.",
+                new Dictionary<string, object> { ["eventId"] = eventId.ToString() },
+                ct);
         }
-
-        await db.SaveChangesAsync(ct);
-        await RecomputeCountsAsync(eventId, ct);
     }
 
     private async Task RecomputeCountsAsync(Guid eventId, CancellationToken ct)
