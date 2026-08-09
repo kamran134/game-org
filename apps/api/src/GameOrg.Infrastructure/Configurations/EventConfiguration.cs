@@ -1,4 +1,5 @@
 using GameOrg.Domain.Entities;
+using GameOrg.Infrastructure.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -17,8 +18,10 @@ public sealed class EventConfiguration : IEntityTypeConfiguration<Event>
         builder.Property(e => e.Status).HasConversion<string>().HasMaxLength(32);
         builder.Property(e => e.Visibility).HasConversion<string>().HasMaxLength(32);
         builder.Property(e => e.CustomLocation).HasMaxLength(200);
-        builder.Property(e => e.Title).HasMaxLength(120);
-        builder.Property(e => e.Description).HasMaxLength(2000);
+        // Лимиты длины (120/2000 на каждый язык) — в валидации сервиса
+        // (EventService), не здесь: это jsonb-словарь, а не одна строка.
+        builder.Property(e => e.TitleI18n).HasColumnType("jsonb").HasConversion(JsonConversions.For<Dictionary<string, string>>());
+        builder.Property(e => e.DescriptionI18n).HasColumnType("jsonb").HasConversion(JsonConversions.For<Dictionary<string, string>>());
         builder.Property(e => e.SkillLevelMin).HasConversion<string>().HasMaxLength(32);
         builder.Property(e => e.SkillLevelMax).HasConversion<string>().HasMaxLength(32);
         builder.Property(e => e.GenderPolicy).HasConversion<string>().HasMaxLength(32);

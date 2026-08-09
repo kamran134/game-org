@@ -19,8 +19,8 @@ public sealed class Event
     /// <summary>Если площадки нет в каталоге — свободный текст. Хотя бы одно из двух.</summary>
     public string? CustomLocation { get; set; }
 
-    public string? Title { get; set; }
-    public string? Description { get; set; }
+    public Dictionary<string, string>? TitleI18n { get; set; }
+    public Dictionary<string, string>? DescriptionI18n { get; set; }
 
     public DateTime StartsAt { get; set; }
     public DateTime EndsAt { get; set; }
