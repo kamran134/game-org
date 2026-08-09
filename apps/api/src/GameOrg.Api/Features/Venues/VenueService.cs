@@ -13,7 +13,7 @@ namespace GameOrg.Api.Features.Venues;
 /// <summary>CRUD площадок, фото (через R2) и отзывы.</summary>
 public sealed class VenueService(GameOrgDbContext db, R2StorageService storage)
 {
-    public async Task<(Venue? Result, string? Error)> CreateAsync(Guid userId, CreateVenueRequest request, CancellationToken ct)
+    public async Task<(Venue? Result, string? Error)> CreateAsync(Guid userId, UserRole creatorRole, CreateVenueRequest request, CancellationToken ct)
     {
         if (request.Name.IsEmpty) return (null, "Название: хотя бы один язык обязателен.");
         if (request.Name.ExceedsMaxLength(120)) return (null, "Название — до 120 символов на каждый язык.");
@@ -43,6 +43,10 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage)
             Phone = request.Phone,
             Website = request.Website,
             CreatedById = userId,
+            // Премодерация (docs/PLAN.md, Шаг 9): обычный пользователь публикует
+            // в общий каталог не сразу, модератор/админ — сразу, иначе плодили
+            // бы очередь себе же.
+            Status = creatorRole == UserRole.User ? VenueStatus.Draft : VenueStatus.Published,
         };
 
         if (request.SportIds is { Count: > 0 })
@@ -107,7 +111,12 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage)
         return (true, null);
     }
 
-    public async Task<VenueDetailDto?> GetBySlugAsync(string slug, string locale, CancellationToken ct)
+    /// <summary>
+    /// viewerId/viewerIsModerator — Draft видят только автор и модератор,
+    /// остальным как будто площадки не существует (404, не 403 — не
+    /// подтверждаем даже сам факт существования чужого черновика).
+    /// </summary>
+    public async Task<VenueDetailDto?> GetBySlugAsync(string slug, string locale, Guid? viewerId, bool viewerIsModerator, CancellationToken ct)
     {
         var venue = await db.Venues
             .Include(v => v.City)
@@ -115,7 +124,40 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage)
             .Include(v => v.Photos).ThenInclude(p => p.Media)
             .FirstOrDefaultAsync(v => v.Slug == slug, ct);
 
-        return venue is null ? null : MapDetail(venue, locale);
+        if (venue is null) return null;
+        if (venue.Status == VenueStatus.Draft && venue.CreatedById != viewerId && !viewerIsModerator) return null;
+
+        return MapDetail(venue, locale);
+    }
+
+    /// <summary>Только модератор/админ — очередь площадок, ожидающих премодерации.</summary>
+    public async Task<List<VenueDto>> GetModerationQueueAsync(string locale, CancellationToken ct)
+    {
+        var venues = await db.Venues
+            .Where(v => v.Status == VenueStatus.Draft)
+            .OrderBy(v => v.CreatedAt)
+            .Take(50)
+            .Select(v => new { v.Id, v.Slug, v.NameI18n, v.AddressI18n, v.Location, v.RatingAvg, v.RatingCount })
+            .ToListAsync(ct);
+
+        return venues.Select(v => new VenueDto(
+            v.Id, v.Slug,
+            Localized.Resolve(v.NameI18n, locale) ?? "",
+            Localized.Resolve(v.AddressI18n, locale),
+            v.Location.Y, v.Location.X,
+            v.RatingAvg, v.RatingCount, null)).ToList();
+    }
+
+    /// <summary>Публикация/скрытие модератором — только эти два статуса, Draft/Merged через этот путь не выставляются.</summary>
+    public async Task<(bool Ok, string? Error)> SetStatusAsync(Guid venueId, VenueStatus status, CancellationToken ct)
+    {
+        var venue = await db.Venues.FirstOrDefaultAsync(v => v.Id == venueId, ct);
+        if (venue is null) return (false, "Площадка не найдена.");
+
+        venue.Status = status;
+        venue.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return (true, null);
     }
 
     private VenueDetailDto MapDetail(Venue venue, string locale) => new(

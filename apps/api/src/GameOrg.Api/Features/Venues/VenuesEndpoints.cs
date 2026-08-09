@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using GameOrg.Api.Common;
+using GameOrg.Domain;
 using GameOrg.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
@@ -24,7 +25,10 @@ public static class VenuesEndpoints
             var locale = RequestLocale.ResolveAndVary(ctx);
             if (radiusKm <= 0) radiusKm = 10;
 
-            var query = db.Venues.AsQueryable();
+            // Только Published — премодерация (docs/PLAN.md, Шаг 9). Свои
+            // Draft-площадки автор видит через GetBySlugAsync напрямую по
+            // ссылке, в общий список они не попадают, пока не пройдут проверку.
+            var query = db.Venues.Where(v => v.Status == VenueStatus.Published);
 
             if (cityId is not null)
                 query = query.Where(v => v.CityId == cityId);
@@ -78,10 +82,14 @@ public static class VenuesEndpoints
         .WithTags("Venues")
         .Produces<List<VenueDto>>();
 
-        app.MapGet("/api/venues/{slug}", async (string slug, HttpContext ctx, VenueService venueService, CancellationToken ct) =>
+        app.MapGet("/api/venues/{slug}", async (string slug, HttpContext ctx, ClaimsPrincipal principal, VenueService venueService, CancellationToken ct) =>
         {
             var locale = RequestLocale.ResolveAndVary(ctx);
-            var venue = await venueService.GetBySlugAsync(slug, locale, ct);
+            // Анонимный эндпоинт, но principal всё равно заполнен, если в запросе
+            // был валидный JWT (UseAuthentication работает независимо от
+            // RequireAuthorization на конкретном маршруте) — нужно знать, кто
+            // смотрит, чтобы решить, можно ли ему чужой Draft.
+            var venue = await venueService.GetBySlugAsync(slug, locale, GetUserId(principal), IsModeratorOrAdmin(principal), ct);
             return venue is null ? Results.NotFound() : Results.Ok(venue);
         })
         .WithName("GetVenue")
@@ -100,10 +108,12 @@ public static class VenuesEndpoints
             if (userId is null) return Results.Unauthorized();
 
             var locale = RequestLocale.Resolve(ctx.Request.Headers.AcceptLanguage.ToString());
-            var (venue, error) = await venueService.CreateAsync(userId.Value, request, ct);
+            var (venue, error) = await venueService.CreateAsync(userId.Value, GetRole(principal), request, ct);
             if (error is not null) return Results.Problem(error, statusCode: StatusCodes.Status400BadRequest);
 
-            var detail = await venueService.GetBySlugAsync(venue!.Slug, locale, ct);
+            // Автор своей же Draft-площадки — viewerId совпадает с CreatedById,
+            // GetBySlugAsync её покажет несмотря на статус.
+            var detail = await venueService.GetBySlugAsync(venue!.Slug, locale, userId, IsModeratorOrAdmin(principal), ct);
             return Results.Created($"/api/venues/{venue.Slug}", detail);
         })
         .WithName("CreateVenue")
@@ -296,8 +306,47 @@ public static class VenuesEndpoints
         .RequireAuthorization()
         .Produces(StatusCodes.Status404NotFound);
 
+        app.MapGet("/api/moderation/venues", async (HttpContext ctx, VenueService venueService, CancellationToken ct) =>
+        {
+            var locale = RequestLocale.Resolve(ctx.Request.Headers.AcceptLanguage.ToString());
+            return Results.Ok(await venueService.GetModerationQueueAsync(locale, ct));
+        })
+        .WithName("GetVenueModerationQueue")
+        .WithTags("Venues")
+        .RequireAuthorization("Moderator")
+        .Produces<List<VenueDto>>();
+
+        app.MapPost("/api/venues/{id:guid}/publish", async (Guid id, VenueService venueService, CancellationToken ct) =>
+        {
+            var (ok, error) = await venueService.SetStatusAsync(id, VenueStatus.Published, ct);
+            return ok ? Results.NoContent() : Results.NotFound(error);
+        })
+        .WithName("PublishVenue")
+        .WithTags("Venues")
+        .RequireAuthorization("Moderator")
+        .Produces(StatusCodes.Status404NotFound);
+
+        app.MapPost("/api/venues/{id:guid}/hide", async (Guid id, VenueService venueService, CancellationToken ct) =>
+        {
+            var (ok, error) = await venueService.SetStatusAsync(id, VenueStatus.Hidden, ct);
+            return ok ? Results.NoContent() : Results.NotFound(error);
+        })
+        .WithName("HideVenue")
+        .WithTags("Venues")
+        .RequireAuthorization("Moderator")
+        .Produces(StatusCodes.Status404NotFound);
+
         return app;
     }
+
+    private static UserRole GetRole(ClaimsPrincipal principal)
+    {
+        var role = principal.FindFirstValue("role");
+        return Enum.TryParse<UserRole>(role, out var parsed) ? parsed : UserRole.User;
+    }
+
+    private static bool IsModeratorOrAdmin(ClaimsPrincipal principal) =>
+        GetRole(principal) is UserRole.Moderator or UserRole.Admin;
 
     private static Guid? GetUserId(ClaimsPrincipal principal)
     {
