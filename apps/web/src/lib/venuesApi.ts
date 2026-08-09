@@ -45,6 +45,8 @@ export type VenueSportItem = {
 
 export type VenuePhoto = { id: string; url: string; isCover: boolean; sortOrder: number };
 
+export type VenueStatus = "Draft" | "Published" | "Hidden" | "Merged";
+
 export type VenueCity = { id: string; slug: string; nameI18n: Record<string, string>; lat: number; lng: number };
 
 export type VenueDetail = {
@@ -71,6 +73,7 @@ export type VenueDetail = {
   ratingCount: number;
   eventsCount: number;
   createdById?: string | null;
+  status: VenueStatus;
   sports: VenueSportItem[];
   photos: VenuePhoto[];
   // Резолвнутые name/description/address выше — для страницы просмотра. Эти
@@ -162,6 +165,56 @@ export async function getVenue(apiUrl: string, locale: string, slug: string): Pr
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Не удалось загрузить площадку (${res.status})`);
   return res.json();
+}
+
+// Кредитная версия getVenue — с cookie. Нужна для Draft-площадки: анонимный
+// getVenue (из Server Component) для неё всегда вернёт 404 даже автору/
+// модератору, GetBySlugAsync на бэкенде смотрит на viewerId/viewerIsModerator
+// из токена, а у SSR-фетча кук нет и никогда не будет. Клиентский компонент
+// вызывает эту функцию, только если анонимный запрос уже вернул null.
+export async function getVenueAuthed(apiUrl: string, locale: string, slug: string): Promise<VenueDetail | null> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/venues/${encodeURIComponent(slug)}`, {
+    credentials: "include",
+    headers: localeHeaders(locale),
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function deleteVenue(apiUrl: string, locale: string, id: string): Promise<void> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/venues/${id}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: localeHeaders(locale),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Не удалось удалить площадку (${res.status})`));
+}
+
+export async function getVenueModerationQueue(apiUrl: string, locale: string): Promise<VenueListItem[]> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/moderation/venues`, {
+    credentials: "include",
+    headers: localeHeaders(locale),
+  });
+  if (!res.ok) throw new Error(`Не удалось загрузить очередь модерации (${res.status})`);
+  return res.json();
+}
+
+export async function publishVenue(apiUrl: string, locale: string, id: string): Promise<void> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/venues/${id}/publish`, {
+    method: "POST",
+    credentials: "include",
+    headers: localeHeaders(locale),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Не удалось опубликовать площадку (${res.status})`));
+}
+
+export async function hideVenue(apiUrl: string, locale: string, id: string): Promise<void> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/venues/${id}/hide`, {
+    method: "POST",
+    credentials: "include",
+    headers: localeHeaders(locale),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Не удалось скрыть площадку (${res.status})`));
 }
 
 export async function getVenueReviews(

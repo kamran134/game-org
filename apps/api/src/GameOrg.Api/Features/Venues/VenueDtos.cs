@@ -53,6 +53,7 @@ public sealed record VenueDetailDto(
     int RatingCount,
     int EventsCount,
     Guid? CreatedById,
+    VenueStatus Status,
     List<VenueSportDto> Sports,
     List<VenuePhotoDto> Photos,
     // Резолвнутые Name/Description/Address выше — для страницы просмотра.

@@ -34,6 +34,7 @@ public sealed record MeProfileDto(
     CityDto? City,
     Guid? AvatarId,
     bool IsVerified,
+    UserRole Role,
     List<UserSportDto> Sports,
     // Резолвнутые DisplayName/Bio выше — для отображения. Эти два — сырые
     // словари по всем языкам, нужны только форме редактирования (/me).

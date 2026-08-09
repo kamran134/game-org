@@ -13,6 +13,7 @@
     "events": "Tədbirlər",
     "sports": "İdman növləri",
     "myProfile": "Mənim profilim",
+    "moderation": "Moderasiya",
     "login": "Giriş",
     "logout": "Çıxış",
     "menu": "Menyu",
@@ -125,6 +126,12 @@
     "noAccessEdit": "Yalnız meydançanı yaradan şəxs redaktə edə bilər.",
     "loginRequired": "Meydança əlavə etmək üçün əvvəlcə daxil olun.",
     "editVenue": "Meydançanı redaktə et",
+    "draftBadge": "Moderasiyada",
+    "draftNotice": "Meydança hələ dərc olunmayıb — onu yalnız siz və moderatorlar görür.",
+    "delete": "Sil",
+    "deleting": "Silinir…",
+    "deleteConfirm": "Meydançanı silmək istəyirsiniz? Bu əməliyyat geri qaytarılmır.",
+    "deleteError": "Meydança silinmədi",
     "fields": {
       "name": "Ad",
       "description": "Təsvir",
@@ -189,6 +196,10 @@
     "notFound": "Tədbir tapılmadı",
     "noAccessEdit": "Yalnız yaradan redaktə edə bilər.",
     "editEvent": "Tədbiri redaktə et",
+    "delete": "Sil",
+    "deleting": "Silinir…",
+    "deleteConfirm": "Tədbiri silmək istəyirsiniz? Bu əməliyyat geri qaytarılmır.",
+    "deleteError": "Tədbir silinmədi",
     "spotsLeft": "Boş yer: {count}",
     "full": "Yer yoxdur",
     "waitlistCount": "Növbədə: {count}",
@@ -261,5 +272,16 @@
     "cancelConfirm": "Tədbiri ləğv etmək istədiyinizə əminsiniz? İştirakçılara bildiriş gedəcək.",
     "cancelError": "Tədbir ləğv edilmədi",
     "eventCancelledNotice": "Bu tədbir ləğv edilib."
+  },
+  "Moderation": {
+    "pageTitle": "Moderasiya növbəsi",
+    "noAccess": "Yalnız moderatorlar üçün əlçatandır.",
+    "loading": "Yüklənir…",
+    "empty": "Növbə boşdur.",
+    "publish": "Dərc et",
+    "hide": "Gizlət",
+    "publishing": "Dərc edilir…",
+    "hiding": "Gizlədilir…",
+    "actionError": "Əməliyyat yerinə yetirilmədi"
   }
 }

@@ -229,6 +229,15 @@ export async function addEventGuest(
   return res.json();
 }
 
+export async function deleteEvent(apiUrl: string, locale: string, eventId: string): Promise<void> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/events/${eventId}`, {
+    method: "DELETE",
+    credentials: "include",
+    headers: localeHeaders(locale),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Не удалось удалить событие (${res.status})`));
+}
+
 export async function cancelEvent(apiUrl: string, locale: string, eventId: string, reason?: string): Promise<void> {
   const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/events/${eventId}/cancel`, {
     method: "POST",

@@ -6,6 +6,8 @@ import { Link } from "@/i18n/navigation";
 import { getVenue, getVenueReviews } from "@/lib/venuesApi";
 import { ReviewsSection } from "./ReviewsSection";
 import { PhotoGallery } from "./PhotoGallery";
+import { VenueActions } from "./VenueActions";
+import { DraftVenueGate } from "./DraftVenueGate";
 
 export const dynamic = "force-dynamic";
 
@@ -44,11 +46,7 @@ export default async function VenuePage({ params }: { params: Promise<{ locale: 
   const venue = await getVenueCached(apiUrl, locale, slug);
 
   if (!venue) {
-    return (
-      <main className="flex flex-1 flex-col items-center justify-center bg-brand-background px-6 py-16">
-        <p className="text-foreground/70">{t("notFound")}</p>
-      </main>
-    );
+    return <DraftVenueGate apiUrl={apiUrl} locale={locale} slug={slug} />;
   }
 
   const reviews = await getVenueReviews(apiUrl, locale, venue.id).catch(() => []);
@@ -135,6 +133,8 @@ export default async function VenuePage({ params }: { params: Promise<{ locale: 
               </a>
             )}
           </div>
+
+          <VenueActions apiUrl={apiUrl} venueId={venue.id} createdById={venue.createdById} status={venue.status} />
 
           <Link
             href={`/venues/${venue.slug}/edit`}

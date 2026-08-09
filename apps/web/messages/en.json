@@ -13,6 +13,7 @@
     "events": "Events",
     "sports": "Sports",
     "myProfile": "My profile",
+    "moderation": "Moderation",
     "login": "Sign in",
     "logout": "Sign out",
     "menu": "Menu",
@@ -125,6 +126,12 @@
     "noAccessEdit": "Only the venue's creator can edit it.",
     "loginRequired": "Sign in first to add a venue.",
     "editVenue": "Edit venue",
+    "draftBadge": "Pending review",
+    "draftNotice": "This venue isn't published yet — only you and moderators can see it.",
+    "delete": "Delete",
+    "deleting": "Deleting…",
+    "deleteConfirm": "Delete this venue? This cannot be undone.",
+    "deleteError": "Failed to delete venue",
     "fields": {
       "name": "Name",
       "description": "Description",
@@ -189,6 +196,10 @@
     "notFound": "Event not found",
     "noAccessEdit": "Only the creator can edit this event.",
     "editEvent": "Edit event",
+    "delete": "Delete",
+    "deleting": "Deleting…",
+    "deleteConfirm": "Delete this event? This cannot be undone.",
+    "deleteError": "Failed to delete event",
     "spotsLeft": "{count} spots left",
     "full": "Full",
     "waitlistCount": "Waitlist: {count}",
@@ -261,5 +272,16 @@
     "cancelConfirm": "Cancel this event? Participants will be notified.",
     "cancelError": "Failed to cancel event",
     "eventCancelledNotice": "This event has been cancelled."
+  },
+  "Moderation": {
+    "pageTitle": "Moderation queue",
+    "noAccess": "Moderators only.",
+    "loading": "Loading…",
+    "empty": "The queue is empty.",
+    "publish": "Publish",
+    "hide": "Hide",
+    "publishing": "Publishing…",
+    "hiding": "Hiding…",
+    "actionError": "Failed to perform action"
   }
 }

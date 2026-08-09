@@ -44,6 +44,14 @@ export function UserMenu({ apiUrl }: { apiUrl: string }) {
 
   return (
     <div className="flex items-center gap-3">
+      {(profile.role === "Moderator" || profile.role === "Admin") && (
+        <Link
+          href="/moderation"
+          className="text-sm font-medium text-foreground/70 transition-colors duration-200 hover:text-foreground"
+        >
+          {t("moderation")}
+        </Link>
+      )}
       <Link
         href="/me"
         className="text-sm font-medium text-foreground transition-colors duration-200 hover:text-brand-primary"

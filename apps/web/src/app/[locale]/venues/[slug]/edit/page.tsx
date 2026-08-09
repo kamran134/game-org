@@ -2,6 +2,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { createApiClient } from "@/lib/apiClient";
 import { getVenue } from "@/lib/venuesApi";
 import { VenueForm } from "../../VenueForm";
+import { VenueEditGate } from "./VenueEditGate";
 
 export const dynamic = "force-dynamic";
 
@@ -16,14 +17,6 @@ export default async function EditVenuePage({
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5100";
   const venue = await getVenue(apiUrl, locale, slug);
-
-  if (!venue) {
-    return (
-      <main className="flex flex-1 flex-col items-center justify-center bg-brand-background px-6 py-16">
-        <p className="text-foreground/70">{t("notFound")}</p>
-      </main>
-    );
-  }
 
   const client = createApiClient();
   const [cities, sports] = await Promise.all([client.api.cities.get(), client.api.sports.get()]);
@@ -41,7 +34,11 @@ export default async function EditVenuePage({
     <main className="flex-1 bg-brand-background px-6 py-16">
       <div className="mx-auto max-w-2xl">
         <h1 className="font-heading mb-6 text-2xl font-semibold text-foreground">{t("editVenue")}</h1>
-        <VenueForm apiUrl={apiUrl} cities={cityOptions} sports={sportOptions} mode="edit" venue={venue} />
+        {venue ? (
+          <VenueForm apiUrl={apiUrl} cities={cityOptions} sports={sportOptions} mode="edit" venue={venue} />
+        ) : (
+          <VenueEditGate apiUrl={apiUrl} locale={locale} slug={slug} cities={cityOptions} sports={sportOptions} />
+        )}
       </div>
     </main>
   );

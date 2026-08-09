@@ -141,6 +141,7 @@ public static class ProfileEndpoints
         Localized.Resolve(user.BioI18n, locale),
         user.BirthDate, user.Gender, user.Phone,
         user.Locale, user.Timezone, user.ProfileVisibility, MapCity(user.City), user.AvatarId, user.IsVerified,
+        user.Role,
         user.Sports.Select(MapUserSport).ToList(),
         LocalizedTextDto.From(user.DisplayNameI18n),
         LocalizedTextDto.FromNullable(user.BioI18n));

@@ -182,7 +182,7 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage)
         venue.IsIndoor, venue.Surface,
         venue.HasLighting, venue.HasShowers, venue.HasParking, venue.HasTribunes,
         venue.PriceHint, venue.Currency, venue.Phone, venue.Website, venue.OpeningHours,
-        venue.RatingAvg, venue.RatingCount, venue.EventsCount, venue.CreatedById,
+        venue.RatingAvg, venue.RatingCount, venue.EventsCount, venue.CreatedById, venue.Status,
         venue.Sports.Select(s => new VenueSportDto(
             new SportDto(s.Sport.Id, s.Sport.Slug, s.Sport.NameI18n, s.Sport.Emoji, s.Sport.HasPositions, s.Sport.IsTeamSport),
             s.Courts)).ToList(),

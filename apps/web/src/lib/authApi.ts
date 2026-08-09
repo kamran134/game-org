@@ -7,6 +7,7 @@ export type SkillLevel = "Beginner" | "Amateur" | "Intermediate" | "Advanced" | 
 export type Footedness = "Left" | "Right" | "Both";
 export type Visibility = "Public" | "Followers" | "Private";
 export type Gender = "Male" | "Female" | "Other";
+export type UserRole = "User" | "Moderator" | "Admin";
 
 export type City = { id: string; slug: string; nameI18n: Record<string, string>; lat: number; lng: number };
 export type UserSportPosition = { positionId: string; code: string; isPrimary: boolean };
@@ -38,6 +39,7 @@ export type MeProfile = {
   city?: City | null;
   avatarId?: string | null;
   isVerified: boolean;
+  role: UserRole;
   sports: UserSport[];
   // Резолвнутые displayName/bio выше — для отображения. Эти два — сырые
   // словари по всем языкам, только для формы редактирования (/me).

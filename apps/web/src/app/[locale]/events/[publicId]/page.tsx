@@ -5,6 +5,7 @@ import { CalendarBlank, MapPinLine, UsersThree } from "@phosphor-icons/react/dis
 import { Link } from "@/i18n/navigation";
 import { getEvent } from "@/lib/eventsApi";
 import { ParticipantsSection } from "./ParticipantsSection";
+import { EventActions } from "./EventActions";
 
 export const dynamic = "force-dynamic";
 
@@ -114,6 +115,8 @@ export default async function EventPage({ params }: { params: Promise<{ locale: 
           >
             {t("editEvent")}
           </Link>
+
+          <EventActions apiUrl={apiUrl} eventId={event.id} createdById={event.createdById} />
         </div>
 
         <ParticipantsSection apiUrl={apiUrl} locale={locale} event={event} />
