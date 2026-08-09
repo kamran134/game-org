@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using GameOrg.Api.Common;
 using GameOrg.Api.Features.Geography;
 using GameOrg.Domain;
 using GameOrg.Domain.Entities;
@@ -12,10 +13,13 @@ public static class ProfileEndpoints
 {
     public static IEndpointRouteBuilder MapProfileEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/me", async (ClaimsPrincipal principal, GameOrgDbContext db, CancellationToken ct) =>
+        app.MapGet("/api/me", async (ClaimsPrincipal principal, HttpContext ctx, GameOrgDbContext db, CancellationToken ct) =>
         {
             var user = await LoadFullUserAsync(db, principal, ct);
-            return user is null ? Results.Unauthorized() : Results.Ok(MapMe(user));
+            if (user is null) return Results.Unauthorized();
+
+            var locale = RequestLocale.ResolveAndVary(ctx);
+            return Results.Ok(MapMe(user, locale));
         })
         .WithName("Me")
         .WithTags("Profiles")
@@ -26,6 +30,7 @@ public static class ProfileEndpoints
         app.MapPatch("/api/me", async (
             UpdateMeRequest request,
             ClaimsPrincipal principal,
+            HttpContext ctx,
             GameOrgDbContext db,
             ProfileService profileService,
             CancellationToken ct) =>
@@ -40,7 +45,8 @@ public static class ProfileEndpoints
                 return Results.Problem(error, statusCode: status);
             }
 
-            return Results.Ok(MapMe(user));
+            var locale = RequestLocale.Resolve(ctx.Request.Headers.AcceptLanguage.ToString());
+            return Results.Ok(MapMe(user, locale));
         })
         .WithName("UpdateMe")
         .WithTags("Profiles")
@@ -87,7 +93,7 @@ public static class ProfileEndpoints
         .RequireAuthorization()
         .Produces(StatusCodes.Status404NotFound);
 
-        app.MapGet("/api/users/{handle}", async (string handle, GameOrgDbContext db, CancellationToken ct) =>
+        app.MapGet("/api/users/{handle}", async (string handle, HttpContext ctx, GameOrgDbContext db, CancellationToken ct) =>
         {
             var normalized = handle.TrimStart('@').ToLowerInvariant();
 
@@ -100,7 +106,8 @@ public static class ProfileEndpoints
             if (user is null || user.ProfileVisibility != Visibility.Public)
                 return Results.NotFound();
 
-            return Results.Ok(MapPublic(user));
+            var locale = RequestLocale.ResolveAndVary(ctx);
+            return Results.Ok(MapPublic(user, locale));
         })
         .WithName("GetPublicProfile")
         .WithTags("Profiles")
@@ -128,13 +135,21 @@ public static class ProfileEndpoints
             .FirstOrDefaultAsync(u => u.Id == userId && u.DeletedAt == null, ct);
     }
 
-    private static MeProfileDto MapMe(User user) => new(
-        user.Id, user.Handle, user.DisplayName, user.Bio, user.BirthDate, user.Gender, user.Phone,
+    private static MeProfileDto MapMe(User user, string locale) => new(
+        user.Id, user.Handle,
+        Localized.Resolve(user.DisplayNameI18n, locale) ?? "",
+        Localized.Resolve(user.BioI18n, locale),
+        user.BirthDate, user.Gender, user.Phone,
         user.Locale, user.Timezone, user.ProfileVisibility, MapCity(user.City), user.AvatarId, user.IsVerified,
-        user.Sports.Select(MapUserSport).ToList());
+        user.Sports.Select(MapUserSport).ToList(),
+        LocalizedTextDto.From(user.DisplayNameI18n),
+        LocalizedTextDto.FromNullable(user.BioI18n));
 
-    private static PublicProfileDto MapPublic(User user) => new(
-        user.Handle, user.DisplayName, user.Bio, MapCity(user.City), user.AvatarId, user.IsVerified,
+    private static PublicProfileDto MapPublic(User user, string locale) => new(
+        user.Handle,
+        Localized.Resolve(user.DisplayNameI18n, locale) ?? "",
+        Localized.Resolve(user.BioI18n, locale),
+        MapCity(user.City), user.AvatarId, user.IsVerified,
         user.Sports.Where(s => s.Visibility == Visibility.Public).Select(MapPublicUserSport).ToList());
 
     private static CityDto? MapCity(City? city) => city is null ? null : new CityDto(city.Id, city.Slug, city.NameI18n, city.Lat, city.Lng);

@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using GameOrg.Api.Common;
 using GameOrg.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
@@ -12,6 +13,7 @@ public static class VenuesEndpoints
     {
         app.MapGet("/api/venues", async (
             GameOrgDbContext db,
+            HttpContext ctx,
             Guid? cityId,
             Guid? sportId,
             double? lat,
@@ -19,6 +21,7 @@ public static class VenuesEndpoints
             double radiusKm = 10,
             CancellationToken ct = default) =>
         {
+            var locale = RequestLocale.ResolveAndVary(ctx);
             if (radiusKm <= 0) radiusKm = 10;
 
             var query = db.Venues.AsQueryable();
@@ -53,8 +56,8 @@ public static class VenuesEndpoints
                 {
                     v.Id,
                     v.Slug,
-                    v.Name,
-                    v.Address,
+                    v.NameI18n,
+                    v.AddressI18n,
                     v.Location,
                     v.RatingAvg,
                     v.RatingCount,
@@ -63,7 +66,9 @@ public static class VenuesEndpoints
                 .ToListAsync(ct);
 
             var venues = raw.Select(v => new VenueDto(
-                v.Id, v.Slug, v.Name, v.Address,
+                v.Id, v.Slug,
+                Localized.Resolve(v.NameI18n, locale) ?? "",
+                Localized.Resolve(v.AddressI18n, locale),
                 v.Location.Y, v.Location.X,
                 v.RatingAvg, v.RatingCount, v.DistanceMeters));
 
@@ -73,9 +78,10 @@ public static class VenuesEndpoints
         .WithTags("Venues")
         .Produces<List<VenueDto>>();
 
-        app.MapGet("/api/venues/{slug}", async (string slug, VenueService venueService, CancellationToken ct) =>
+        app.MapGet("/api/venues/{slug}", async (string slug, HttpContext ctx, VenueService venueService, CancellationToken ct) =>
         {
-            var venue = await venueService.GetBySlugAsync(slug, ct);
+            var locale = RequestLocale.ResolveAndVary(ctx);
+            var venue = await venueService.GetBySlugAsync(slug, locale, ct);
             return venue is null ? Results.NotFound() : Results.Ok(venue);
         })
         .WithName("GetVenue")
@@ -86,20 +92,25 @@ public static class VenuesEndpoints
         app.MapPost("/api/venues", async (
             CreateVenueRequest request,
             ClaimsPrincipal principal,
+            HttpContext ctx,
             VenueService venueService,
             CancellationToken ct) =>
         {
             var userId = GetUserId(principal);
             if (userId is null) return Results.Unauthorized();
 
-            var venue = await venueService.CreateAsync(userId.Value, request, ct);
-            var detail = await venueService.GetBySlugAsync(venue.Slug, ct);
+            var locale = RequestLocale.Resolve(ctx.Request.Headers.AcceptLanguage.ToString());
+            var (venue, error) = await venueService.CreateAsync(userId.Value, request, ct);
+            if (error is not null) return Results.Problem(error, statusCode: StatusCodes.Status400BadRequest);
+
+            var detail = await venueService.GetBySlugAsync(venue!.Slug, locale, ct);
             return Results.Created($"/api/venues/{venue.Slug}", detail);
         })
         .WithName("CreateVenue")
         .WithTags("Venues")
         .RequireAuthorization()
         .Produces<VenueDetailDto>(StatusCodes.Status201Created)
+        .Produces(StatusCodes.Status400BadRequest)
         .Produces(StatusCodes.Status401Unauthorized);
 
         app.MapPatch("/api/venues/{id:guid}", async (
@@ -115,7 +126,14 @@ public static class VenuesEndpoints
             var (ok, error) = await venueService.UpdateAsync(id, userId.Value, request, ct);
             if (!ok)
             {
-                var status = error == "Площадка не найдена." ? StatusCodes.Status404NotFound : StatusCodes.Status403Forbidden;
+                // Форбидден — только несовпадение владельца; всё остальное
+                // (не найдена / провалилась валидация полей) — 404/400.
+                var status = error switch
+                {
+                    "Площадка не найдена." => StatusCodes.Status404NotFound,
+                    "Редактировать может только создатель." => StatusCodes.Status403Forbidden,
+                    _ => StatusCodes.Status400BadRequest,
+                };
                 return Results.Problem(error, statusCode: status);
             }
 
@@ -124,6 +142,7 @@ public static class VenuesEndpoints
         .WithName("UpdateVenue")
         .WithTags("Venues")
         .RequireAuthorization()
+        .Produces(StatusCodes.Status400BadRequest)
         .Produces(StatusCodes.Status403Forbidden)
         .Produces(StatusCodes.Status404NotFound);
 
@@ -191,10 +210,12 @@ public static class VenuesEndpoints
             Guid id,
             int skip,
             int take,
+            HttpContext ctx,
             VenueService venueService,
             CancellationToken ct) =>
         {
-            var reviews = await venueService.GetReviewsAsync(id, skip, take == 0 ? 20 : take, ct);
+            var locale = RequestLocale.ResolveAndVary(ctx);
+            var reviews = await venueService.GetReviewsAsync(id, skip, take == 0 ? 20 : take, locale, ct);
             return Results.Ok(reviews);
         })
         .WithName("GetVenueReviews")
@@ -205,13 +226,15 @@ public static class VenuesEndpoints
             Guid id,
             UpsertReviewRequest request,
             ClaimsPrincipal principal,
+            HttpContext ctx,
             VenueService venueService,
             CancellationToken ct) =>
         {
             var userId = GetUserId(principal);
             if (userId is null) return Results.Unauthorized();
 
-            var (result, error, conflict) = await venueService.CreateReviewAsync(id, userId.Value, request, ct);
+            var locale = RequestLocale.Resolve(ctx.Request.Headers.AcceptLanguage.ToString());
+            var (result, error, conflict) = await venueService.CreateReviewAsync(id, userId.Value, request, locale, ct);
             if (error is not null)
             {
                 var status = conflict ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest;
@@ -231,13 +254,15 @@ public static class VenuesEndpoints
             Guid reviewId,
             UpsertReviewRequest request,
             ClaimsPrincipal principal,
+            HttpContext ctx,
             VenueService venueService,
             CancellationToken ct) =>
         {
             var userId = GetUserId(principal);
             if (userId is null) return Results.Unauthorized();
 
-            var (result, error) = await venueService.UpdateReviewAsync(id, reviewId, userId.Value, request, ct);
+            var locale = RequestLocale.Resolve(ctx.Request.Headers.AcceptLanguage.ToString());
+            var (result, error) = await venueService.UpdateReviewAsync(id, reviewId, userId.Value, request, locale, ct);
             if (error is not null)
             {
                 var status = error is "Отзыв не найден." ? StatusCodes.Status404NotFound : StatusCodes.Status403Forbidden;

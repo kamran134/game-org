@@ -1,3 +1,4 @@
+using GameOrg.Api.Common;
 using GameOrg.Api.Features.Geography;
 using GameOrg.Api.Features.Sports;
 using GameOrg.Domain;
@@ -12,14 +13,23 @@ namespace GameOrg.Api.Features.Venues;
 /// <summary>CRUD площадок, фото (через R2) и отзывы.</summary>
 public sealed class VenueService(GameOrgDbContext db, R2StorageService storage)
 {
-    public async Task<Venue> CreateAsync(Guid userId, CreateVenueRequest request, CancellationToken ct)
+    public async Task<(Venue? Result, string? Error)> CreateAsync(Guid userId, CreateVenueRequest request, CancellationToken ct)
     {
+        if (request.Name.IsEmpty) return (null, "Название: хотя бы один язык обязателен.");
+        if (request.Name.ExceedsMaxLength(120)) return (null, "Название — до 120 символов на каждый язык.");
+        if (request.Description?.ExceedsMaxLength(2000) == true) return (null, "Описание — до 2000 символов на каждый язык.");
+        if (request.Address?.ExceedsMaxLength(300) == true) return (null, "Адрес — до 300 символов на каждый язык.");
+
+        var nameI18n = request.Name.ToDict()!; // не null — IsEmpty уже проверили выше
         var venue = new Venue
         {
-            Slug = await GenerateUniqueSlugAsync(request.Name, ct),
-            Name = request.Name,
-            Description = request.Description,
-            Address = request.Address,
+            // Слаг — из первого непустого имени по фолбэку az→en→ru, не из
+            // языка запроса: один и тот же слаг должен получаться независимо
+            // от того, на каком языке заполняли форму (см. docs/PLAN.md, Шаг 7.5).
+            Slug = await GenerateUniqueSlugAsync(Localized.Resolve(nameI18n, RequestLocale.Default) ?? "", ct),
+            NameI18n = nameI18n,
+            DescriptionI18n = request.Description?.ToDict(),
+            AddressI18n = request.Address?.ToDict(),
             CityId = request.CityId,
             Location = new Point(request.Lng, request.Lat) { SRID = 4326 },
             IsIndoor = request.IsIndoor,
@@ -43,7 +53,7 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage)
 
         db.Venues.Add(venue);
         await db.SaveChangesAsync(ct);
-        return venue;
+        return (venue, null);
     }
 
     public async Task<(bool Ok, string? Error)> UpdateAsync(Guid venueId, Guid userId, UpdateVenueRequest request, CancellationToken ct)
@@ -52,9 +62,25 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage)
         if (venue is null) return (false, "Площадка не найдена.");
         if (venue.CreatedById != userId) return (false, "Редактировать может только создатель.");
 
-        if (request.Name is not null) venue.Name = request.Name;
-        if (request.Description is not null) venue.Description = request.Description.Length == 0 ? null : request.Description;
-        if (request.Address is not null) venue.Address = request.Address.Length == 0 ? null : request.Address;
+        // Слаг НЕ трогаем при редактировании, даже если название целиком поменялось —
+        // ломать существующие ссылки на площадку нельзя.
+        if (request.Name is not null)
+        {
+            if (request.Name.ExceedsMaxLength(120)) return (false, "Название — до 120 символов на каждый язык.");
+            var nameDict = request.Name.ToDict();
+            if (nameDict is null) return (false, "Название: хотя бы один язык обязателен.");
+            venue.NameI18n = nameDict;
+        }
+        if (request.Description is not null)
+        {
+            if (request.Description.ExceedsMaxLength(2000)) return (false, "Описание — до 2000 символов на каждый язык.");
+            venue.DescriptionI18n = request.Description.ToDict();
+        }
+        if (request.Address is not null)
+        {
+            if (request.Address.ExceedsMaxLength(300)) return (false, "Адрес — до 300 символов на каждый язык.");
+            venue.AddressI18n = request.Address.ToDict();
+        }
         if (request.CityId is not null) venue.CityId = request.CityId;
         if (request.Lat is not null && request.Lng is not null)
             venue.Location = new Point(request.Lng.Value, request.Lat.Value) { SRID = 4326 };
@@ -81,7 +107,7 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage)
         return (true, null);
     }
 
-    public async Task<VenueDetailDto?> GetBySlugAsync(string slug, CancellationToken ct)
+    public async Task<VenueDetailDto?> GetBySlugAsync(string slug, string locale, CancellationToken ct)
     {
         var venue = await db.Venues
             .Include(v => v.City)
@@ -89,11 +115,14 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage)
             .Include(v => v.Photos).ThenInclude(p => p.Media)
             .FirstOrDefaultAsync(v => v.Slug == slug, ct);
 
-        return venue is null ? null : MapDetail(venue);
+        return venue is null ? null : MapDetail(venue, locale);
     }
 
-    private VenueDetailDto MapDetail(Venue venue) => new(
-        venue.Id, venue.Slug, venue.Name, venue.Description, venue.Address,
+    private VenueDetailDto MapDetail(Venue venue, string locale) => new(
+        venue.Id, venue.Slug,
+        Localized.Resolve(venue.NameI18n, locale) ?? "",
+        Localized.Resolve(venue.DescriptionI18n, locale),
+        Localized.Resolve(venue.AddressI18n, locale),
         venue.City is null ? null : new CityDto(venue.City.Id, venue.City.Slug, venue.City.NameI18n, venue.City.Lat, venue.City.Lng),
         venue.Location.Y, venue.Location.X,
         venue.IsIndoor, venue.Surface,
@@ -104,7 +133,10 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage)
             new SportDto(s.Sport.Id, s.Sport.Slug, s.Sport.NameI18n, s.Sport.Emoji, s.Sport.HasPositions, s.Sport.IsTeamSport),
             s.Courts)).ToList(),
         venue.Photos.OrderBy(p => p.SortOrder).Select(p => new VenuePhotoDto(
-            p.Id, storage.GetPublicUrl(p.Media.BucketKey), p.IsCover, p.SortOrder)).ToList());
+            p.Id, storage.GetPublicUrl(p.Media.BucketKey), p.IsCover, p.SortOrder)).ToList(),
+        LocalizedTextDto.From(venue.NameI18n),
+        LocalizedTextDto.FromNullable(venue.DescriptionI18n),
+        LocalizedTextDto.FromNullable(venue.AddressI18n));
 
     public async Task<(PresignPhotoResponse? Result, string? Error)> PresignPhotoAsync(
         Guid venueId, Guid userId, PresignPhotoRequest request, CancellationToken ct)
@@ -192,17 +224,25 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage)
         return true;
     }
 
-    public async Task<List<VenueReviewDto>> GetReviewsAsync(Guid venueId, int skip, int take, CancellationToken ct) =>
-        await db.VenueReviews
+    public async Task<List<VenueReviewDto>> GetReviewsAsync(Guid venueId, int skip, int take, string locale, CancellationToken ct)
+    {
+        // Localized.Resolve — обычный C#-метод, EF не умеет транслировать его
+        // в SQL, поэтому сначала материализуем сырые DisplayNameI18n, резолвим
+        // в памяти — тот же приём, что с Location.X/Y в GET /api/venues.
+        var raw = await db.VenueReviews
             .Where(r => r.VenueId == venueId)
             .OrderByDescending(r => r.CreatedAt)
             .Skip(Math.Max(skip, 0))
             .Take(Math.Clamp(take, 1, 50))
-            .Select(r => new VenueReviewDto(r.Id, r.AuthorId, r.Author.DisplayName, r.Rating, r.Text, r.CreatedAt, r.UpdatedAt))
+            .Select(r => new { r.Id, r.AuthorId, r.Author.DisplayNameI18n, r.Rating, r.Text, r.CreatedAt, r.UpdatedAt })
             .ToListAsync(ct);
 
+        return raw.Select(r => new VenueReviewDto(
+            r.Id, r.AuthorId, Localized.Resolve(r.DisplayNameI18n, locale) ?? "", r.Rating, r.Text, r.CreatedAt, r.UpdatedAt)).ToList();
+    }
+
     public async Task<(VenueReviewDto? Result, string? Error, bool Conflict)> CreateReviewAsync(
-        Guid venueId, Guid userId, UpsertReviewRequest request, CancellationToken ct)
+        Guid venueId, Guid userId, UpsertReviewRequest request, string locale, CancellationToken ct)
     {
         if (request.Rating is < 1 or > 5)
             return (null, "Оценка должна быть от 1 до 5.", false);
@@ -219,11 +259,11 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage)
         await RecomputeRatingAsync(venueId, ct);
 
         var author = await db.Users.FirstAsync(u => u.Id == userId, ct);
-        return (new VenueReviewDto(review.Id, userId, author.DisplayName, review.Rating, review.Text, review.CreatedAt, review.UpdatedAt), null, false);
+        return (new VenueReviewDto(review.Id, userId, Localized.Resolve(author.DisplayNameI18n, locale) ?? "", review.Rating, review.Text, review.CreatedAt, review.UpdatedAt), null, false);
     }
 
     public async Task<(VenueReviewDto? Result, string? Error)> UpdateReviewAsync(
-        Guid venueId, Guid reviewId, Guid userId, UpsertReviewRequest request, CancellationToken ct)
+        Guid venueId, Guid reviewId, Guid userId, UpsertReviewRequest request, string locale, CancellationToken ct)
     {
         if (request.Rating is < 1 or > 5)
             return (null, "Оценка должна быть от 1 до 5.");
@@ -240,7 +280,7 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage)
         await db.SaveChangesAsync(ct);
         await RecomputeRatingAsync(venueId, ct);
 
-        return (new VenueReviewDto(review.Id, review.AuthorId, review.Author.DisplayName, review.Rating, review.Text, review.CreatedAt, review.UpdatedAt), null);
+        return (new VenueReviewDto(review.Id, review.AuthorId, Localized.Resolve(review.Author.DisplayNameI18n, locale) ?? "", review.Rating, review.Text, review.CreatedAt, review.UpdatedAt), null);
     }
 
     public async Task<bool> RemoveReviewAsync(Guid venueId, Guid reviewId, Guid userId, CancellationToken ct)

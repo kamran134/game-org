@@ -11,7 +11,7 @@ namespace GameOrg.Api.Features.Identity;
 /// </summary>
 public sealed class IdentityService(GameOrgDbContext db)
 {
-    public async Task<User> SignInAsync(ExternalIdentity identity, CancellationToken ct)
+    public async Task<User> SignInAsync(ExternalIdentity identity, string locale, CancellationToken ct)
     {
         var account = await db.Accounts
             .Include(a => a.User)
@@ -32,7 +32,9 @@ public sealed class IdentityService(GameOrgDbContext db)
         var user = new User
         {
             Handle = handle,
-            DisplayName = identity.DisplayName,
+            // Пишем имя от провайдера в язык, с которого регистрировались —
+            // остальные языки человек дозаполнит сам в /me (см. docs/PLAN.md, Шаг 7.5).
+            DisplayNameI18n = new Dictionary<string, string> { [locale] = identity.DisplayName },
         };
 
         var newAccount = new Account

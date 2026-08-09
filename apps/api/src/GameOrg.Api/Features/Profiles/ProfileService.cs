@@ -26,16 +26,19 @@ public sealed partial class ProfileService(GameOrgDbContext db)
 
         if (request.DisplayName is not null)
         {
-            if (request.DisplayName.Length is 0 or > 80)
-                return ("Имя должно быть от 1 до 80 символов.", false);
-            user.DisplayName = request.DisplayName;
+            if (request.DisplayName.ExceedsMaxLength(80))
+                return ("Имя — до 80 символов на каждый язык.", false);
+            var displayNameDict = request.DisplayName.ToDict();
+            if (displayNameDict is null)
+                return ("Имя: хотя бы один язык обязателен.", false);
+            user.DisplayNameI18n = displayNameDict;
         }
 
         if (request.Bio is not null)
         {
-            if (request.Bio.Length > 500)
-                return ("Bio — до 500 символов.", false);
-            user.Bio = request.Bio.Length == 0 ? null : request.Bio;
+            if (request.Bio.ExceedsMaxLength(500))
+                return ("Bio — до 500 символов на каждый язык.", false);
+            user.BioI18n = request.Bio.ToDict();
         }
 
         if (request.Phone is not null)

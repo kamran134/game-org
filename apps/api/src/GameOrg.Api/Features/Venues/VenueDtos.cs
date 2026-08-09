@@ -1,3 +1,4 @@
+using GameOrg.Api.Common;
 using GameOrg.Api.Features.Geography;
 using GameOrg.Api.Features.Sports;
 using GameOrg.Domain;
@@ -53,13 +54,18 @@ public sealed record VenueDetailDto(
     int EventsCount,
     Guid? CreatedById,
     List<VenueSportDto> Sports,
-    List<VenuePhotoDto> Photos);
+    List<VenuePhotoDto> Photos,
+    // Резолвнутые Name/Description/Address выше — для страницы просмотра.
+    // Эти три — сырые словари по всем языкам, нужны только форме редактирования.
+    LocalizedTextDto NameI18n,
+    LocalizedTextDto? DescriptionI18n,
+    LocalizedTextDto? AddressI18n);
 
 /// <summary>Поле есть в теле и не null → применяется в PATCH; отсутствует/null → не трогается.</summary>
 public sealed record UpdateVenueRequest(
-    string? Name,
-    string? Description,
-    string? Address,
+    LocalizedTextDto? Name,
+    LocalizedTextDto? Description,
+    LocalizedTextDto? Address,
     Guid? CityId,
     double? Lat,
     double? Lng,
@@ -76,9 +82,9 @@ public sealed record UpdateVenueRequest(
     List<Guid>? SportIds);
 
 public sealed record CreateVenueRequest(
-    string Name,
-    string? Description,
-    string? Address,
+    LocalizedTextDto Name,
+    LocalizedTextDto? Description,
+    LocalizedTextDto? Address,
     Guid? CityId,
     double Lat,
     double Lng,

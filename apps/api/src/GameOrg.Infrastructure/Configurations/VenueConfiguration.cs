@@ -13,9 +13,14 @@ public sealed class VenueConfiguration : IEntityTypeConfiguration<Venue>
         builder.Property(e => e.Id).ValueGeneratedNever();
         // Уникальность slug среди "живых" — partial unique index в 001_constraints.sql.
         builder.Property(e => e.Slug).HasColumnType("citext");
-        builder.Property(e => e.Name).HasMaxLength(120);
-        builder.Property(e => e.Description).HasMaxLength(2000);
-        builder.Property(e => e.Address).HasMaxLength(300);
+        // Лимиты длины (120/2000/300 на каждый язык) — в валидации сервиса
+        // (см. VenueService), не здесь: это jsonb-словарь, а не одна строка.
+        builder.Property(e => e.NameI18n).HasColumnType("jsonb").HasConversion(JsonConversions.For<Dictionary<string, string>>());
+        builder.Property(e => e.DescriptionI18n).HasColumnType("jsonb").HasConversion(JsonConversions.For<Dictionary<string, string>>());
+        builder.Property(e => e.AddressI18n).HasColumnType("jsonb").HasConversion(JsonConversions.For<Dictionary<string, string>>());
+        // Generated-колонка Postgres (см. миграцию MultilingualUserContent) —
+        // EF только читает значение обратно после save, никогда не пишет его.
+        builder.Property(e => e.SearchText).HasColumnType("text").ValueGeneratedOnAddOrUpdate();
 
         builder.Property(e => e.Location).HasColumnType("geography (Point, 4326)");
         builder.HasIndex(e => e.Location).HasMethod("GIST");

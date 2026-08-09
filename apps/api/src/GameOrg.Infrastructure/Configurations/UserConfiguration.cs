@@ -1,4 +1,5 @@
 using GameOrg.Domain.Entities;
+using GameOrg.Infrastructure.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -13,8 +14,13 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         // Уникальность handle среди "живых" — partial unique index в docs/schema/001_constraints.sql,
         // не здесь: обычный @unique блокировал бы переиспользование ника после soft-delete.
         builder.Property(e => e.Handle).HasColumnType("citext");
-        builder.Property(e => e.DisplayName).HasMaxLength(80);
-        builder.Property(e => e.Bio).HasMaxLength(500);
+        // Лимиты длины (80/500 на каждый язык) — в валидации сервиса (ProfileService),
+        // не здесь: это jsonb-словарь, а не одна строка.
+        builder.Property(e => e.DisplayNameI18n).HasColumnType("jsonb").HasConversion(JsonConversions.For<Dictionary<string, string>>());
+        builder.Property(e => e.BioI18n).HasColumnType("jsonb").HasConversion(JsonConversions.For<Dictionary<string, string>>());
+        // Generated-колонка Postgres (см. миграцию MultilingualUserContent) —
+        // EF только читает значение обратно после save, никогда не пишет его.
+        builder.Property(e => e.SearchText).HasColumnType("text").ValueGeneratedOnAddOrUpdate();
         builder.Property(e => e.Phone).HasMaxLength(20);
         builder.Property(e => e.Locale).HasMaxLength(5);
         builder.Property(e => e.Status).HasConversion<string>().HasMaxLength(32);

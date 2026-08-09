@@ -1,3 +1,5 @@
+using GameOrg.Api.Common;
+
 namespace GameOrg.Api.Features.Identity;
 
 public sealed record AuthResponseDto(Guid UserId, string Handle, string DisplayName);
@@ -21,10 +23,11 @@ public static class AuthEndpoints
             if (!TelegramLoginValidator.TryValidate(payload, botToken, out var identity) || identity is null)
                 return Results.Unauthorized();
 
-            var user = await identityService.SignInAsync(identity, ct);
+            var locale = RequestLocale.Resolve(ctx.Request.Headers.AcceptLanguage.ToString());
+            var user = await identityService.SignInAsync(identity, locale, ct);
             await tokenService.IssueTokensAsync(user, ctx, ct);
 
-            return Results.Ok(new AuthResponseDto(user.Id, user.Handle, user.DisplayName));
+            return Results.Ok(new AuthResponseDto(user.Id, user.Handle, Localized.Resolve(user.DisplayNameI18n, locale) ?? ""));
         })
         .WithName("AuthTelegram")
         .WithTags("Auth")
@@ -34,9 +37,10 @@ public static class AuthEndpoints
         app.MapPost("/api/auth/refresh", async (TokenService tokenService, HttpContext ctx, CancellationToken ct) =>
         {
             var user = await tokenService.RefreshAsync(ctx, ct);
-            return user is null
-                ? Results.Unauthorized()
-                : Results.Ok(new AuthResponseDto(user.Id, user.Handle, user.DisplayName));
+            if (user is null) return Results.Unauthorized();
+
+            var locale = RequestLocale.Resolve(ctx.Request.Headers.AcceptLanguage.ToString());
+            return Results.Ok(new AuthResponseDto(user.Id, user.Handle, Localized.Resolve(user.DisplayNameI18n, locale) ?? ""));
         })
         .WithName("AuthRefresh")
         .WithTags("Auth")

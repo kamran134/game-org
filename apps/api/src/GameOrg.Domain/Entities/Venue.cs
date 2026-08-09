@@ -6,9 +6,9 @@ public sealed class Venue
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public required string Slug { get; set; }
-    public required string Name { get; set; }
-    public string? Description { get; set; }
-    public string? Address { get; set; }
+    public required Dictionary<string, string> NameI18n { get; set; }
+    public Dictionary<string, string>? DescriptionI18n { get; set; }
+    public Dictionary<string, string>? AddressI18n { get; set; }
     public Guid? CityId { get; set; }
     public City? City { get; set; }
     /// <summary>geography(Point,4326). X = долгота, Y = широта.</summary>
@@ -32,6 +32,13 @@ public sealed class Venue
     public decimal? RatingAvg { get; set; }
     public int RatingCount { get; set; }
     public int EventsCount { get; set; }
+
+    /// <summary>
+    /// Generated-колонка Postgres (STORED, склейка name/address по az/ru/en) —
+    /// заполняется базой, из кода никогда не пишем. Используется GIN-индексом
+    /// venues_search_trgm; сам поиск по имени в GET /api/venues пока не подключён.
+    /// </summary>
+    public string? SearchText { get; private set; }
 
     public Guid? CreatedById { get; set; }
     public User? CreatedBy { get; set; }
