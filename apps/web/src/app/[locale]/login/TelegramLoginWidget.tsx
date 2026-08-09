@@ -77,11 +77,14 @@ export function TelegramLoginWidget({ apiUrl, botUsername }: { apiUrl: string; b
     <div className="flex flex-col items-center gap-3">
       {/* Виджет Telegram рендерит iframe с собственным (всегда светлым) фоном —
           нейтральная белая подложка не даёт ему смотреться посторонним пятном
-          на тёмной теме сайта. Фиксированная высота — чтобы карточка не
-          дёргалась, пока скрипт telegram.org грузится и вставляет iframe. */}
+          на тёмной теме сайта. Без паддинга и тени: иначе тень (тёмная) поверх
+          белого фона читается как двойная чёрно-белая рамка вокруг кнопки —
+          подложка должна плотно облегать саму кнопку, а не выглядеть отдельной
+          карточкой. Фиксированная высота — чтобы блок не дёргался, пока скрипт
+          telegram.org грузится и вставляет iframe. */}
       <div
         ref={containerRef}
-        className="flex min-h-[52px] items-center justify-center rounded-xl bg-white p-2 shadow-sm"
+        className="flex min-h-[40px] items-center justify-center overflow-hidden rounded-[10px] bg-white"
       />
       {authorizing && <p className="text-sm text-foreground/60">{t("authorizing")}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
