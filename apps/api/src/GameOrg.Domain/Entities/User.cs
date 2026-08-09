@@ -13,6 +13,7 @@ public sealed class User
     public string Locale { get; set; } = "ru";
     public string Timezone { get; set; } = "Asia/Baku";
     public UserStatus Status { get; set; } = UserStatus.Active;
+    public UserRole Role { get; set; } = UserRole.User;
     /// <summary>«Галочка»: тренер, владелец площадки.</summary>
     public bool IsVerified { get; set; }
     public Visibility ProfileVisibility { get; set; } = Visibility.Public;

@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using GameOrg.Domain;
 using GameOrg.Domain.Entities;
 using GameOrg.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -42,7 +43,11 @@ public sealed class TokenService(GameOrgDbContext db, IConfiguration configurati
             .Include(s => s.User)
             .FirstOrDefaultAsync(s => s.RefreshTokenHash == hash && s.RevokedAt == null && s.ExpiresAt > DateTime.UtcNow, ct);
 
-        if (session is null)
+        // null — забаненный (Status != Active): сессия ещё жива, но новых
+        // токенов не получает, та же проверка, что при логине
+        // (IdentityService.SignInAsync). Не отзываем сессию — просто не
+        // продлеваем; если разбанят, следующий вызов снова заработает.
+        if (session is null || session.User.Status != UserStatus.Active)
             return null;
 
         session.RevokedAt = DateTime.UtcNow;
@@ -82,6 +87,7 @@ public sealed class TokenService(GameOrgDbContext db, IConfiguration configurati
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim("handle", user.Handle),
+            new Claim("role", user.Role.ToString()),
         };
 
         var token = new JwtSecurityToken(

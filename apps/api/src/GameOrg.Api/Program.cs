@@ -8,6 +8,7 @@ using GameOrg.Api.Features.Identity;
 using GameOrg.Api.Features.Profiles;
 using GameOrg.Api.Features.Sports;
 using GameOrg.Api.Features.Venues;
+using GameOrg.Domain;
 using GameOrg.Infrastructure;
 using GameOrg.Infrastructure.Notifications;
 using GameOrg.Infrastructure.Seed;
@@ -118,6 +119,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             ClockSkew = TimeSpan.FromSeconds(30),
+            // Та же ловушка, что с "sub": по умолчанию ASP.NET Core ищет роль
+            // в длинном ClaimTypes.Role URI, а токен несёт короткий "role"
+            // (TokenService.CreateAccessToken) — без этого RequireRole никогда
+            // не находит claim, даже у валидного токена с нужной ролью.
+            RoleClaimType = "role",
         };
 
         options.Events = new JwtBearerEvents
@@ -130,7 +136,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             },
         };
     });
-builder.Services.AddAuthorization();
+// Admin может всё, что может Moderator — Moderator ⊂ Admin (docs/PLAN.md, Шаг 9).
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("Moderator", policy => policy.RequireRole(nameof(UserRole.Moderator), nameof(UserRole.Admin)));
+    options.AddPolicy("Admin", policy => policy.RequireRole(nameof(UserRole.Admin)));
+});
 
 var app = builder.Build();
 

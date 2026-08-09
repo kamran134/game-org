@@ -25,6 +25,8 @@ public static class AuthEndpoints
 
             var locale = RequestLocale.Resolve(ctx.Request.Headers.AcceptLanguage.ToString());
             var user = await identityService.SignInAsync(identity, locale, ct);
+            // null — забаненный (Status != Active), см. IdentityService.SignInAsync.
+            if (user is null) return Results.Unauthorized();
             await tokenService.IssueTokensAsync(user, ctx, ct);
 
             return Results.Ok(new AuthResponseDto(user.Id, user.Handle, Localized.Resolve(user.DisplayNameI18n, locale) ?? ""));

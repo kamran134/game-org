@@ -24,6 +24,7 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(e => e.Phone).HasMaxLength(20);
         builder.Property(e => e.Locale).HasMaxLength(5);
         builder.Property(e => e.Status).HasConversion<string>().HasMaxLength(32);
+        builder.Property(e => e.Role).HasConversion<string>().HasMaxLength(32);
         builder.Property(e => e.Gender).HasConversion<string>().HasMaxLength(32);
         builder.Property(e => e.ProfileVisibility).HasConversion<string>().HasMaxLength(32);
 

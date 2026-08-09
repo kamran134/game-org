@@ -2,6 +2,9 @@ namespace GameOrg.Domain;
 
 public enum UserStatus { Active, Suspended, Deactivated }
 
+/// <summary>Платформенная роль — не путать с ClubRole (роль внутри клуба). Moderator ⊂ Admin.</summary>
+public enum UserRole { User, Moderator, Admin }
+
 public enum Gender { Male, Female, Other }
 
 public enum AuthProvider { Telegram, Email, Google, Apple }
