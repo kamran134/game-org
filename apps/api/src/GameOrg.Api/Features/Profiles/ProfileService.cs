@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using GameOrg.Api.Common;
 using GameOrg.Domain.Entities;
 using GameOrg.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -46,7 +47,7 @@ public sealed partial class ProfileService(GameOrgDbContext db)
 
         if (request.Locale is not null)
         {
-            if (!SupportedLocales.Contains(request.Locale))
+            if (!RequestLocale.Supported.Contains(request.Locale))
                 return ("Locale должен быть az, ru или en.", false);
             user.Locale = request.Locale;
         }
@@ -140,7 +141,4 @@ public sealed partial class ProfileService(GameOrgDbContext db)
 
     [GeneratedRegex("^[a-z][a-z0-9_]{2,29}$")]
     private static partial Regex HandleFormat();
-
-    // Ровно три локали сайта (apps/web/messages/*.json) — см. мультиязычность az/ru/en.
-    private static readonly HashSet<string> SupportedLocales = ["az", "ru", "en"];
 }
