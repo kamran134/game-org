@@ -2,37 +2,30 @@
 
 import { useEffect, useState } from "react";
 import { Moon, Sun } from "@phosphor-icons/react";
-import { usePathname } from "@/i18n/navigation";
+import { THEME_COOKIE, THEME_COOKIE_MAX_AGE, isTheme, type Theme } from "@/lib/theme";
 
-// data-theme стоит на <html> только после ручного выбора (см.
-// THEME_INIT_SCRIPT в layout) — пока его нет, реальная тема идёт от
-// prefers-color-scheme. Без учёта медиа-запроса при первом клике "next"
-// считался от пустого dataset.theme и мог просто повторно выставить то,
-// что уже и так показано через media query — переключатель бы не работал.
-function getEffectiveTheme(): "light" | "dark" {
+// Источник правды — data-theme на <html>: на сервере он отрендерен из куки
+// ([locale]/layout.tsx), на самом первом визите его успевает проставить
+// THEME_INIT_SCRIPT из prefers-color-scheme. matchMedia здесь — только
+// подстраховка на случай, если ни того, ни другого не случилось.
+function getEffectiveTheme(): Theme {
   const explicit = document.documentElement.dataset.theme;
-  if (explicit === "light" || explicit === "dark") return explicit;
+  if (isTheme(explicit)) return explicit;
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 export function ThemeToggle() {
   // До монтирования не знаем эффективную тему — рендерим пусто, чтобы не
   // мигать не тем значком.
-  const [theme, setTheme] = useState<"light" | "dark" | null>(null);
-  const pathname = usePathname();
+  const [theme, setTheme] = useState<Theme | null>(null);
 
-  // THEME_INIT_SCRIPT в layout ставит data-theme только один раз, до первой
-  // гидратации. При смене локали (LocaleSwitcher) [locale]/layout.tsx —
-  // корневой (нет обычного app/layout.tsx над ним), и переход между
-  // локалями пересоздаёт <html> без этого атрибута — он тихо пропадает, и
-  // CSS откатывается на светлые значения из :root. pathname меняется при
-  // любой навигации, включая смену локали, — переустанавливаем атрибут
-  // каждый раз, а не только один раз при монтировании.
+  // Только для иконки. Восстанавливать тему при навигации не нужно:
+  // data-theme приходит с сервера в JSX, поэтому переживает смену локали
+  // сам по себе — никакой завязки на pathname/локаль здесь нет и быть не
+  // должно.
   useEffect(() => {
-    const t = getEffectiveTheme();
-    document.documentElement.dataset.theme = t;
-    setTheme(t);
-  }, [pathname]);
+    setTheme(getEffectiveTheme());
+  }, []);
 
   function toggle() {
     const root = document.documentElement;
@@ -42,9 +35,9 @@ export function ThemeToggle() {
     // transition глобально, затем возвращаем — hover вне переключения темы
     // остаётся плавным.
     root.classList.add("theme-switching");
-    const next = getEffectiveTheme() === "dark" ? "light" : "dark";
+    const next: Theme = getEffectiveTheme() === "dark" ? "light" : "dark";
     root.dataset.theme = next;
-    localStorage.setItem("theme", next);
+    document.cookie = `${THEME_COOKIE}=${next};path=/;max-age=${THEME_COOKIE_MAX_AGE};samesite=lax`;
     setTheme(next);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => root.classList.remove("theme-switching"));

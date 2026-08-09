@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { Inter, Oswald } from "next/font/google";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
@@ -6,15 +7,20 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { routing } from "@/i18n/routing";
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { THEME_COOKIE, isTheme } from "@/lib/theme";
 import "../globals.css";
 
-// Блокирующий инлайн-скрипт до гидратации — ВСЕГДА проставляет data-theme
-// (сохранённый выбор или, если его ещё нет, системный prefers-color-scheme
-// через matchMedia). Без этого миг до React был бы не тем, а сам CSS
-// намеренно не использует @media (prefers-color-scheme) — см. комментарий
-// в globals.css про то, как Tailwind иначе запекает тёмное значение мимо
-// data-theme.
-const THEME_INIT_SCRIPT = `(function(){try{var s=localStorage.getItem('theme');var t=(s==='light'||s==='dark')?s:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');document.documentElement.dataset.theme=t;}catch(e){}})();`;
+// Фолбэк только для случая «куки ещё нет» (первый визит): резолвит тему из
+// prefers-color-scheme и сразу пишет куку, чтобы уже следующий рендер шёл с
+// сервера. Когда кука есть — data-theme приходит из JSX ниже, и этот скрипт
+// не трогает атрибут вообще.
+//
+// Почему кука, а не localStorage: [locale]/layout.tsx — корневой layout (нет
+// app/layout.tsx над ним), поэтому смена локали пересоздаёт <html>. Атрибут,
+// выставленный императивно из JS, при этом теряется, а отрендеренный из JSX —
+// нет, потому что им владеет React. Кука — единственный источник темы,
+// доступный серверу, и это то, что развязывает тему и язык окончательно.
+const THEME_INIT_SCRIPT = `(function(){try{if(/(?:^|;\\s*)${THEME_COOKIE}=(light|dark)/.test(document.cookie))return;var t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t;document.cookie='${THEME_COOKIE}='+t+';path=/;max-age=31536000;samesite=lax';}catch(e){}})();`;
 
 // Спортивный/атлетический шрифтовой дуэт — единый на весь сайт (не только
 // лендинг): Barlow/Barlow Condensed кириллицу не тянут в next/font/google,
@@ -65,11 +71,18 @@ export default async function LocaleLayout({
   // (generateStaticParams + setRequestLocale — обязательная пара).
   setRequestLocale(locale);
 
-  // suppressHydrationWarning — THEME_INIT_SCRIPT ставит data-theme до
-  // гидратации, React об этом не знает и иначе шумит про несовпадение.
+  // Тема приезжает с сервера отдельно от локали — они никак не связаны:
+  // локаль живёт в URL, тема в куке. Смена одного не задевает другое.
+  const themeCookie = (await cookies()).get(THEME_COOKIE)?.value;
+  const theme = isTheme(themeCookie) ? themeCookie : undefined;
+
+  // suppressHydrationWarning — на самом первом визите (куки ещё нет)
+  // THEME_INIT_SCRIPT ставит data-theme до гидратации, React об этом не
+  // знает и иначе шумит про несовпадение.
   return (
     <html
       lang={locale}
+      data-theme={theme}
       className={`${brandHeading.variable} ${brandSans.variable} h-full antialiased`}
       suppressHydrationWarning
     >
