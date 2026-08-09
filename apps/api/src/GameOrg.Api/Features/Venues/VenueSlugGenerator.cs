@@ -1,14 +1,15 @@
 using System.Security.Cryptography;
 using System.Text;
+using GameOrg.Api.Common;
 
 namespace GameOrg.Api.Features.Venues;
 
 /// <summary>
-/// Слаг из названия площадки. В отличие от HandleGenerator (Identity) — не
-/// транслитерирует не-латиницу (названия часто на русском/азербайджанском):
-/// просто берёт латиницу/цифры из имени и ВСЕГДА добавляет случайный суффикс,
-/// чтобы не зависеть от читаемости для не-латинских названий и не бороться за
-/// уникальность голого имени.
+/// Слаг из названия площадки. Az/ru буквы транслитерируются в латиницу
+/// (см. <see cref="Transliterator"/>), всё остальное не-латинское — просто
+/// выбрасывается. ВСЕГДА добавляет случайный суффикс, чтобы не бороться за
+/// уникальность голого имени (и не зависеть от того, осталось ли что-то
+/// читаемое после транслитерации).
 /// </summary>
 public static class VenueSlugGenerator
 {
@@ -17,7 +18,7 @@ public static class VenueSlugGenerator
         var sb = new StringBuilder();
         var lastWasHyphen = true; // чтобы слаг не начинался с дефиса
 
-        foreach (var ch in name.ToLowerInvariant())
+        foreach (var ch in Transliterator.Transliterate(name).ToLowerInvariant())
         {
             if (ch is >= 'a' and <= 'z' or >= '0' and <= '9')
             {

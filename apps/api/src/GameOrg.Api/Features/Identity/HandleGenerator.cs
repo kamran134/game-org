@@ -1,18 +1,21 @@
 using System.Security.Cryptography;
 using System.Text;
+using GameOrg.Api.Common;
 
 namespace GameOrg.Api.Features.Identity;
 
 /// <summary>
 /// Нормализует источник (username/first_name от провайдера) в формат хендла
 /// БД: `^[a-z][a-z0-9_]{2,29}$` (см. 001_constraints.sql, users_handle_format).
+/// Az/ru буквы транслитерируются в латиницу (см. <see cref="Transliterator"/>)
+/// вместо того, чтобы просто выбрасываться.
 /// </summary>
 public static class HandleGenerator
 {
     public static string Normalize(string source)
     {
         var sb = new StringBuilder();
-        foreach (var ch in source.ToLowerInvariant())
+        foreach (var ch in Transliterator.Transliterate(source).ToLowerInvariant())
         {
             if (ch is >= 'a' and <= 'z' or >= '0' and <= '9' or '_')
                 sb.Append(ch);
