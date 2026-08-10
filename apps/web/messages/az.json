@@ -71,6 +71,7 @@
   },
   "Me": {
     "pageTitle": "Mənim profilim",
+    "editProfile": "Profili redaktə et",
     "loading": "Yüklənir…",
     "fields": {
       "name": "Ad",

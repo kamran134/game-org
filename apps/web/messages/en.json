@@ -71,6 +71,7 @@
   },
   "Me": {
     "pageTitle": "My profile",
+    "editProfile": "Edit profile",
     "loading": "Loading…",
     "fields": {
       "name": "Name",
