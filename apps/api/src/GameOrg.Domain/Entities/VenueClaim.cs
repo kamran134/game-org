@@ -12,4 +12,6 @@ public sealed class VenueClaim
     public string? Evidence { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? ResolvedAt { get; set; }
+    public Guid? ResolvedById { get; set; }
+    public User? ResolvedBy { get; set; }
 }

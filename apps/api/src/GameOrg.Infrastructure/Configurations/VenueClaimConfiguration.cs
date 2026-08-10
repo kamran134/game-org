@@ -13,7 +13,9 @@ public sealed class VenueClaimConfiguration : IEntityTypeConfiguration<VenueClai
         builder.Property(e => e.Status).HasConversion<string>().HasMaxLength(32);
         builder.Property(e => e.Evidence).HasMaxLength(1000);
 
+        builder.HasOne(e => e.Venue).WithMany().HasForeignKey(e => e.VenueId).OnDelete(DeleteBehavior.Cascade);
         builder.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne(e => e.ResolvedBy).WithMany().HasForeignKey(e => e.ResolvedById).OnDelete(DeleteBehavior.SetNull);
 
         builder.HasIndex(e => new { e.VenueId, e.UserId }).IsUnique();
     }
