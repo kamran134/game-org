@@ -1,5 +1,6 @@
 using GameOrg.Api.Common;
 using GameOrg.Api.Features.Geography;
+using GameOrg.Api.Features.Moderation;
 using GameOrg.Api.Features.Sports;
 using GameOrg.Domain;
 using GameOrg.Domain.Entities;
@@ -11,7 +12,7 @@ using NetTopologySuite.Geometries;
 namespace GameOrg.Api.Features.Venues;
 
 /// <summary>CRUD площадок, фото (через R2) и отзывы.</summary>
-public sealed class VenueService(GameOrgDbContext db, R2StorageService storage)
+public sealed class VenueService(GameOrgDbContext db, R2StorageService storage, AuditLogService auditLog)
 {
     public async Task<(Venue? Result, string? Error)> CreateAsync(Guid userId, UserRole creatorRole, CreateVenueRequest request, CancellationToken ct)
     {
@@ -125,6 +126,7 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage)
 
         venue.DeletedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
+        await auditLog.LogAsync(userId, "venue.delete", nameof(Venue), venue.Id, null, null, ct);
         return (true, null);
     }
 
@@ -161,14 +163,18 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage)
     }
 
     /// <summary>Публикация/скрытие модератором — только эти два статуса, Draft/Merged через этот путь не выставляются.</summary>
-    public async Task<(bool Ok, string? Error)> SetStatusAsync(Guid venueId, VenueStatus status, CancellationToken ct)
+    public async Task<(bool Ok, string? Error)> SetStatusAsync(Guid venueId, Guid actorId, VenueStatus status, CancellationToken ct)
     {
         var venue = await db.Venues.FirstOrDefaultAsync(v => v.Id == venueId, ct);
         if (venue is null) return (false, "Площадка не найдена.");
 
+        var before = venue.Status;
         venue.Status = status;
         venue.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
+        await auditLog.LogAsync(
+            actorId, status == VenueStatus.Published ? "venue.publish" : "venue.hide", nameof(Venue), venue.Id,
+            new { Status = before }, new { Status = status }, ct);
         return (true, null);
     }
 

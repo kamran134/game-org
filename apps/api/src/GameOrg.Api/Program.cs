@@ -5,6 +5,7 @@ using System.Threading.RateLimiting;
 using GameOrg.Api.Features.Events;
 using GameOrg.Api.Features.Geography;
 using GameOrg.Api.Features.Identity;
+using GameOrg.Api.Features.Moderation;
 using GameOrg.Api.Features.Profiles;
 using GameOrg.Api.Features.Sports;
 using GameOrg.Api.Features.Venues;
@@ -79,6 +80,7 @@ builder.Services.AddScoped<ProfileService>();
 builder.Services.AddSingleton<R2StorageService>();
 builder.Services.AddScoped<VenueService>();
 builder.Services.AddScoped<EventService>();
+builder.Services.AddScoped<AuditLogService>();
 
 builder.Services.AddHttpClient<TelegramSender>();
 builder.Services.AddScoped<NotificationSender>();

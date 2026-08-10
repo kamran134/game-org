@@ -1,4 +1,5 @@
 using GameOrg.Api.Common;
+using GameOrg.Api.Features.Moderation;
 using GameOrg.Api.Features.Sports;
 using GameOrg.Domain;
 using GameOrg.Domain.Entities;
@@ -9,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 namespace GameOrg.Api.Features.Events;
 
 /// <summary>CRUD событий, запись участников (с вейтлистом), отмена. Напоминания за 24ч/2ч — EventReminderJob.</summary>
-public sealed class EventService(GameOrgDbContext db, NotificationSender notificationSender)
+public sealed class EventService(GameOrgDbContext db, NotificationSender notificationSender, AuditLogService auditLog)
 {
     public async Task<(Event? Result, string? Error)> CreateAsync(Guid userId, CreateEventRequest request, CancellationToken ct)
     {
@@ -247,6 +248,7 @@ public sealed class EventService(GameOrgDbContext db, NotificationSender notific
 
         ev.DeletedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
+        await auditLog.LogAsync(userId, "event.delete", nameof(Event), ev.Id, null, null, ct);
         return (true, null);
     }
 

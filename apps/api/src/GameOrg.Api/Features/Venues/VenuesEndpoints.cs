@@ -336,9 +336,12 @@ public static class VenuesEndpoints
         .RequireAuthorization("Moderator")
         .Produces<List<VenueDto>>();
 
-        app.MapPost("/api/venues/{id:guid}/publish", async (Guid id, VenueService venueService, CancellationToken ct) =>
+        app.MapPost("/api/venues/{id:guid}/publish", async (Guid id, ClaimsPrincipal principal, VenueService venueService, CancellationToken ct) =>
         {
-            var (ok, error) = await venueService.SetStatusAsync(id, VenueStatus.Published, ct);
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            var (ok, error) = await venueService.SetStatusAsync(id, userId.Value, VenueStatus.Published, ct);
             return ok ? Results.NoContent() : Results.NotFound(error);
         })
         .WithName("PublishVenue")
@@ -346,9 +349,12 @@ public static class VenuesEndpoints
         .RequireAuthorization("Moderator")
         .Produces(StatusCodes.Status404NotFound);
 
-        app.MapPost("/api/venues/{id:guid}/hide", async (Guid id, VenueService venueService, CancellationToken ct) =>
+        app.MapPost("/api/venues/{id:guid}/hide", async (Guid id, ClaimsPrincipal principal, VenueService venueService, CancellationToken ct) =>
         {
-            var (ok, error) = await venueService.SetStatusAsync(id, VenueStatus.Hidden, ct);
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            var (ok, error) = await venueService.SetStatusAsync(id, userId.Value, VenueStatus.Hidden, ct);
             return ok ? Results.NoContent() : Results.NotFound(error);
         })
         .WithName("HideVenue")
