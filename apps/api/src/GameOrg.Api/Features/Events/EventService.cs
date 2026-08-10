@@ -59,6 +59,11 @@ public sealed class EventService(GameOrgDbContext db, NotificationSender notific
         if (ev is null) return (false, "Событие не найдено.");
         if (ev.CreatedById != userId) return (false, "Редактировать может только создатель.");
 
+        var startsAtBefore = ev.StartsAt;
+        var endsAtBefore = ev.EndsAt;
+        var venueIdBefore = ev.VenueId;
+        var customLocationBefore = ev.CustomLocation;
+
         if (request.Visibility is not null) ev.Visibility = request.Visibility.Value;
         if (request.VenueId is not null) ev.VenueId = request.VenueId;
         if (request.CustomLocation is not null) ev.CustomLocation = request.CustomLocation.Length == 0 ? null : request.CustomLocation;
@@ -87,6 +92,29 @@ public sealed class EventService(GameOrgDbContext db, NotificationSender notific
 
         ev.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
+
+        var scheduleChanged = ev.StartsAt != startsAtBefore || ev.EndsAt != endsAtBefore
+            || ev.VenueId != venueIdBefore || ev.CustomLocation != customLocationBefore;
+        if (scheduleChanged)
+        {
+            var participantUserIds = await db.EventParticipants
+                .Where(p => p.EventId == eventId && p.UserId != null
+                    && (p.Status == ParticipationStatus.Confirmed || p.Status == ParticipationStatus.Maybe))
+                .Select(p => p.UserId!.Value)
+                .ToListAsync(ct);
+
+            foreach (var participantUserId in participantUserIds)
+            {
+                await notificationSender.SendAsync(
+                    participantUserId,
+                    NotificationType.EventUpdated,
+                    $"EVENT_UPDATED:{eventId}:{participantUserId}:{ev.UpdatedAt.Ticks}",
+                    "Детали события изменились — время или место.",
+                    new Dictionary<string, object> { ["eventId"] = eventId.ToString() },
+                    ct);
+            }
+        }
+
         return (true, null);
     }
 
@@ -148,6 +176,17 @@ public sealed class EventService(GameOrgDbContext db, NotificationSender notific
         await db.SaveChangesAsync(ct);
         await RecomputeCountsAsync(eventId, ct);
 
+        if (ev.CreatedById is Guid creatorId && creatorId != userId)
+        {
+            await notificationSender.SendAsync(
+                creatorId,
+                NotificationType.ParticipantJoined,
+                $"PARTICIPANT_JOINED:{eventId}:{participant.Id}",
+                "Новая запись на ваше событие.",
+                new Dictionary<string, object> { ["eventId"] = eventId.ToString() },
+                ct);
+        }
+
         var user = await db.Users.FirstAsync(u => u.Id == userId, ct);
         return (new EventParticipantDto(
             participant.Id, userId, Localized.Resolve(user.DisplayNameI18n, locale) ?? "",
@@ -158,6 +197,7 @@ public sealed class EventService(GameOrgDbContext db, NotificationSender notific
     {
         var participant = await db.EventParticipants.FirstOrDefaultAsync(p => p.EventId == eventId && p.UserId == userId, ct);
         if (participant is null) return false;
+        var participantId = participant.Id;
 
         db.EventParticipants.Remove(participant);
         await db.SaveChangesAsync(ct);
@@ -167,6 +207,18 @@ public sealed class EventService(GameOrgDbContext db, NotificationSender notific
         // свободные места и очередь; безопасно звать всегда, а не только
         // когда точно знаем, что участник был Confirmed.
         await PromoteFromWaitlistAsync(eventId, ct);
+
+        var createdById = await db.Events.Where(e => e.Id == eventId).Select(e => e.CreatedById).FirstOrDefaultAsync(ct);
+        if (createdById is Guid creatorId && creatorId != userId)
+        {
+            await notificationSender.SendAsync(
+                creatorId,
+                NotificationType.ParticipantLeft,
+                $"PARTICIPANT_LEFT:{eventId}:{participantId}",
+                "Кто-то отменил запись на ваше событие.",
+                new Dictionary<string, object> { ["eventId"] = eventId.ToString() },
+                ct);
+        }
         return true;
     }
 
@@ -318,7 +370,33 @@ public sealed class EventService(GameOrgDbContext db, NotificationSender notific
         ev.ConfirmedCount = await participants.CountAsync(p => p.Status == ParticipationStatus.Confirmed, ct);
         ev.MaybeCount = await participants.CountAsync(p => p.Status == ParticipationStatus.Maybe, ct);
         ev.WaitlistCount = await participants.CountAsync(p => p.Status == ParticipationStatus.Waitlisted, ct);
+
+        // Только вперёд, без отката — если потом кто-то вышел и счётчик упал
+        // ниже MinParticipants, статус остаётся Confirmed (решение, Шаг 11):
+        // не дёргать статус туда-сюда и не спамить "снова не подтверждено".
+        var justConfirmed = ev.Status == EventStatus.Scheduled && ev.MinParticipants != null && ev.ConfirmedCount >= ev.MinParticipants;
+        if (justConfirmed) ev.Status = EventStatus.Confirmed;
+
         await db.SaveChangesAsync(ct);
+
+        if (justConfirmed)
+        {
+            var confirmedUserIds = await participants
+                .Where(p => p.Status == ParticipationStatus.Confirmed && p.UserId != null)
+                .Select(p => p.UserId!.Value)
+                .ToListAsync(ct);
+
+            foreach (var confirmedUserId in confirmedUserIds)
+            {
+                await notificationSender.SendAsync(
+                    confirmedUserId,
+                    NotificationType.EventConfirmed,
+                    $"EVENT_CONFIRMED:{eventId}:{confirmedUserId}",
+                    "Набралось достаточно участников — событие подтверждено.",
+                    new Dictionary<string, object> { ["eventId"] = eventId.ToString() },
+                    ct);
+            }
+        }
     }
 
     /// <summary>Проверки, которые в БД — CHECK-констрейнты (001_constraints.sql) — до похода в БД, с понятным сообщением вместо голого constraint violation.</summary>
