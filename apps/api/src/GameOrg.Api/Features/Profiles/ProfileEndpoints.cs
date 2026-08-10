@@ -147,6 +147,7 @@ public static class ProfileEndpoints
         LocalizedTextDto.FromNullable(user.BioI18n));
 
     private static PublicProfileDto MapPublic(User user, string locale) => new(
+        user.Id,
         user.Handle,
         Localized.Resolve(user.DisplayNameI18n, locale) ?? "",
         Localized.Resolve(user.BioI18n, locale),

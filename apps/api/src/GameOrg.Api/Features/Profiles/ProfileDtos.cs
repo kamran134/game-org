@@ -52,7 +52,14 @@ public sealed record PublicUserSportDto(
     int? JerseyNumber,
     List<UserSportPositionDto> Positions);
 
+/// <summary>
+/// Id добавлен для Шага 10 (жалоба на пользователя нужен TargetId) — идёт через Kiota,
+/// который здесь не перегенерировать, но новое поле безопасно: клиент Kiota кладёт
+/// нераспознанные top-level свойства в additionalData (тот же механизм, что и у
+/// nameI18n), просто без строгой типизации — читать как additionalData.id на фронте.
+/// </summary>
 public sealed record PublicProfileDto(
+    Guid Id,
     string Handle,
     string DisplayName,
     string? Bio,

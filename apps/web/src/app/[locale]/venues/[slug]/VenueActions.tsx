@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { fetchMe, type MeProfile } from "@/lib/authApi";
-import { deleteVenue, type VenueStatus } from "@/lib/venuesApi";
+import { createVenueClaim, deleteVenue, type VenueStatus } from "@/lib/venuesApi";
 
 export function VenueActions({
   apiUrl,
@@ -24,6 +24,9 @@ export function VenueActions({
   const [me, setMe] = useState<MeProfile | null | undefined>(undefined);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [claiming, setClaiming] = useState(false);
+  const [claimed, setClaimed] = useState(false);
+  const [claimError, setClaimError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchMe(apiUrl, locale)
@@ -32,6 +35,7 @@ export function VenueActions({
   }, [apiUrl, locale]);
 
   const canManage = !!me && (me.id === createdById || me.role === "Moderator" || me.role === "Admin");
+  const canClaim = !!me && me.id !== createdById;
 
   async function handleDelete() {
     if (!window.confirm(t("deleteConfirm"))) return;
@@ -43,6 +47,19 @@ export function VenueActions({
     } catch (err) {
       setError(err instanceof Error ? err.message : t("deleteError"));
       setDeleting(false);
+    }
+  }
+
+  async function handleClaim() {
+    setClaiming(true);
+    setClaimError(null);
+    try {
+      await createVenueClaim(apiUrl, locale, venueId);
+      setClaimed(true);
+    } catch (err) {
+      setClaimError(err instanceof Error ? err.message : t("claimError"));
+    } finally {
+      setClaiming(false);
     }
   }
 
@@ -63,7 +80,19 @@ export function VenueActions({
           {deleting ? t("deleting") : t("delete")}
         </button>
       )}
+      {canClaim && !claimed && (
+        <button
+          type="button"
+          onClick={handleClaim}
+          disabled={claiming}
+          className="cursor-pointer text-sm font-medium text-foreground/60 transition-colors duration-200 hover:text-foreground disabled:opacity-50"
+        >
+          {claiming ? t("claiming") : t("claimVenue")}
+        </button>
+      )}
+      {claimed && <p className="text-sm text-foreground/60">{t("claimSent")}</p>}
       {error && <p className="w-full text-sm text-red-600">{error}</p>}
+      {claimError && <p className="w-full text-sm text-red-600">{claimError}</p>}
     </div>
   );
 }

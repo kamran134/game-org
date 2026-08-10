@@ -132,6 +132,10 @@
     "deleting": "Deleting…",
     "deleteConfirm": "Delete this venue? This cannot be undone.",
     "deleteError": "Failed to delete venue",
+    "claimVenue": "Claim ownership",
+    "claiming": "Sending…",
+    "claimSent": "Claim sent, waiting for a moderator to review it.",
+    "claimError": "Failed to send claim",
     "fields": {
       "name": "Name",
       "description": "Description",
@@ -282,6 +286,42 @@
     "hide": "Hide",
     "publishing": "Publishing…",
     "hiding": "Hiding…",
-    "actionError": "Failed to perform action"
+    "actionError": "Failed to perform action",
+    "tabs": {
+      "venues": "Publishing",
+      "reports": "Reports",
+      "claims": "Venue claims"
+    },
+    "targetTypes": {
+      "Venue": "Venue",
+      "Event": "Event",
+      "User": "User",
+      "Review": "Review"
+    },
+    "reportedBy": "Reported by: {name}",
+    "markResolved": "Resolved",
+    "markRejected": "Reject",
+    "banUser": "Ban",
+    "claimBy": "Claim by {name}",
+    "approve": "Approve",
+    "reject": "Reject"
+  },
+  "Report": {
+    "button": "Report",
+    "reason": "Reason",
+    "comment": "Comment (optional)",
+    "submit": "Submit",
+    "sending": "Sending…",
+    "cancel": "Cancel",
+    "sent": "Report sent.",
+    "error": "Failed to send report",
+    "reasons": {
+      "Spam": "Spam",
+      "Abuse": "Abuse",
+      "FakeProfile": "Fake profile",
+      "WrongInfo": "Wrong info",
+      "InappropriateContent": "Inappropriate content",
+      "Other": "Other"
+    }
   }
 }

@@ -8,6 +8,7 @@ import { ReviewsSection } from "./ReviewsSection";
 import { PhotoGallery } from "./PhotoGallery";
 import { VenueActions } from "./VenueActions";
 import { DraftVenueGate } from "./DraftVenueGate";
+import { ReportButton } from "@/components/ReportButton";
 
 export const dynamic = "force-dynamic";
 
@@ -136,12 +137,12 @@ export default async function VenuePage({ params }: { params: Promise<{ locale: 
 
           <VenueActions apiUrl={apiUrl} venueId={venue.id} createdById={venue.createdById} status={venue.status} />
 
-          <Link
-            href={`/venues/${venue.slug}/edit`}
-            className="mt-6 inline-block text-sm font-medium text-brand-primary hover:underline"
-          >
-            {t("editVenue")}
-          </Link>
+          <div className="mt-6 flex flex-wrap items-center gap-4">
+            <Link href={`/venues/${venue.slug}/edit`} className="text-sm font-medium text-brand-primary hover:underline">
+              {t("editVenue")}
+            </Link>
+            <ReportButton apiUrl={apiUrl} targetType="Venue" targetId={venue.id} />
+          </div>
         </div>
 
         <PhotoGallery apiUrl={apiUrl} locale={locale} venueId={venue.id} initialPhotos={venue.photos} />

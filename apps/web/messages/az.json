@@ -132,6 +132,10 @@
     "deleting": "Silinir…",
     "deleteConfirm": "Meydançanı silmək istəyirsiniz? Bu əməliyyat geri qaytarılmır.",
     "deleteError": "Meydança silinmədi",
+    "claimVenue": "Meydançaya sahiblik tələb et",
+    "claiming": "Göndərilir…",
+    "claimSent": "Tələb göndərildi, moderator baxışını gözləyin.",
+    "claimError": "Tələb göndərilmədi",
     "fields": {
       "name": "Ad",
       "description": "Təsvir",
@@ -282,6 +286,42 @@
     "hide": "Gizlət",
     "publishing": "Dərc edilir…",
     "hiding": "Gizlədilir…",
-    "actionError": "Əməliyyat yerinə yetirilmədi"
+    "actionError": "Əməliyyat yerinə yetirilmədi",
+    "tabs": {
+      "venues": "Dərc",
+      "reports": "Şikayətlər",
+      "claims": "Meydança tələbləri"
+    },
+    "targetTypes": {
+      "Venue": "Meydança",
+      "Event": "Tədbir",
+      "User": "İstifadəçi",
+      "Review": "Rəy"
+    },
+    "reportedBy": "Şikayət edən: {name}",
+    "markResolved": "Həll edildi",
+    "markRejected": "Rədd et",
+    "banUser": "Bloklamaq",
+    "claimBy": "{name} tərəfindən tələb",
+    "approve": "Təsdiqlə",
+    "reject": "Rədd et"
+  },
+  "Report": {
+    "button": "Şikayət et",
+    "reason": "Səbəb",
+    "comment": "Şərh (istəyə bağlı)",
+    "submit": "Göndər",
+    "sending": "Göndərilir…",
+    "cancel": "Ləğv et",
+    "sent": "Şikayət göndərildi.",
+    "error": "Şikayət göndərilmədi",
+    "reasons": {
+      "Spam": "Spam",
+      "Abuse": "Təhqir",
+      "FakeProfile": "Saxta profil",
+      "WrongInfo": "Yanlış məlumat",
+      "InappropriateContent": "Uyğunsuz məzmun",
+      "Other": "Digər"
+    }
   }
 }

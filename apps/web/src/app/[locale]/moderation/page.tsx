@@ -1,5 +1,5 @@
 import { setRequestLocale } from "next-intl/server";
-import { ModerationQueue } from "./ModerationQueue";
+import { ModerationTabs } from "./ModerationTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +11,7 @@ export default async function ModerationPage({ params }: { params: Promise<{ loc
   return (
     <main className="flex-1 bg-brand-background px-6 py-16">
       <div className="mx-auto max-w-3xl">
-        <ModerationQueue apiUrl={apiUrl} />
+        <ModerationTabs apiUrl={apiUrl} />
       </div>
     </main>
   );

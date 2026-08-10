@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Star } from "@phosphor-icons/react";
 import { fetchMe, type MeProfile } from "@/lib/authApi";
 import { createVenueReview, removeVenueReview, updateVenueReview, type VenueReview } from "@/lib/venuesApi";
+import { ReportButton } from "@/components/ReportButton";
 
 export function ReviewsSection({
   apiUrl,
@@ -85,6 +86,11 @@ export function ReviewsSection({
               </span>
             </div>
             {r.text && <p className="mt-1 text-sm text-foreground/70">{r.text}</p>}
+            {me && r.authorId !== me.id && (
+              <div className="mt-1">
+                <ReportButton apiUrl={apiUrl} targetType="Review" targetId={r.id} />
+              </div>
+            )}
           </li>
         ))}
       </ul>

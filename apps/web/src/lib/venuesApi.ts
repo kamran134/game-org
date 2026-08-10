@@ -217,6 +217,54 @@ export async function hideVenue(apiUrl: string, locale: string, id: string): Pro
   if (!res.ok) throw new Error(await errorMessage(res, `Не удалось скрыть площадку (${res.status})`));
 }
 
+export type VenueClaim = {
+  id: string;
+  venueId: string;
+  venueName: string;
+  userId: string;
+  userDisplayName: string;
+  evidence?: string | null;
+  status: "Open" | "InReview" | "Resolved" | "Rejected";
+  createdAt: string;
+};
+
+export async function createVenueClaim(apiUrl: string, locale: string, venueId: string, evidence?: string): Promise<void> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/venues/${venueId}/claims`, {
+    method: "POST",
+    credentials: "include",
+    headers: localeHeaders(locale, { "Content-Type": "application/json" }),
+    body: JSON.stringify({ evidence: evidence ?? null }),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Не удалось подать заявку (${res.status})`));
+}
+
+export async function getVenueClaimQueue(apiUrl: string, locale: string): Promise<VenueClaim[]> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/moderation/venue-claims`, {
+    credentials: "include",
+    headers: localeHeaders(locale),
+  });
+  if (!res.ok) throw new Error(`Не удалось загрузить заявки (${res.status})`);
+  return res.json();
+}
+
+export async function approveVenueClaim(apiUrl: string, locale: string, id: string): Promise<void> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/moderation/venue-claims/${id}/approve`, {
+    method: "POST",
+    credentials: "include",
+    headers: localeHeaders(locale),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Не удалось одобрить заявку (${res.status})`));
+}
+
+export async function rejectVenueClaim(apiUrl: string, locale: string, id: string): Promise<void> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/moderation/venue-claims/${id}/reject`, {
+    method: "POST",
+    credentials: "include",
+    headers: localeHeaders(locale),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Не удалось отклонить заявку (${res.status})`));
+}
+
 export async function getVenueReviews(
   apiUrl: string,
   locale: string,

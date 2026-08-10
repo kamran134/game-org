@@ -5,6 +5,7 @@ import { MapPinLine } from "@phosphor-icons/react/dist/ssr";
 import { createApiClient } from "@/lib/apiClient";
 import { routing } from "@/i18n/routing";
 import { getPathname } from "@/i18n/navigation";
+import { ReportButton } from "@/components/ReportButton";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +66,12 @@ export default async function PublicProfilePage({
   }
 
   const cityName = profile.city?.nameI18n?.additionalData?.[locale] as string | undefined;
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5100";
+  // PublicProfileDto.Id — новое поле с Шага 10, добавлено на бэкенде, но
+  // Kiota-клиент здесь не перегенерировать (требует живой API+БД). Kiota
+  // кладёт нераспознанные top-level свойства в additionalData вместо того,
+  // чтобы их терять — тот же механизм, что уже используется для nameI18n.
+  const profileId = profile.additionalData?.id as string | undefined;
 
   return (
     <main className="flex-1 bg-brand-background px-6 py-16">
@@ -78,6 +85,11 @@ export default async function PublicProfilePage({
               <MapPinLine size={16} weight="bold" />
               {cityName ?? profile.city.slug}
             </p>
+          )}
+          {profileId && (
+            <div className="mt-4">
+              <ReportButton apiUrl={apiUrl} targetType="User" targetId={profileId} />
+            </div>
           )}
         </div>
 

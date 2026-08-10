@@ -6,6 +6,7 @@ import { Link } from "@/i18n/navigation";
 import { getEvent } from "@/lib/eventsApi";
 import { ParticipantsSection } from "./ParticipantsSection";
 import { EventActions } from "./EventActions";
+import { ReportButton } from "@/components/ReportButton";
 
 export const dynamic = "force-dynamic";
 
@@ -109,12 +110,12 @@ export default async function EventPage({ params }: { params: Promise<{ locale: 
             </p>
           )}
 
-          <Link
-            href={`/events/${event.publicId}/edit`}
-            className="mt-6 inline-block text-sm font-medium text-brand-primary hover:underline"
-          >
-            {t("editEvent")}
-          </Link>
+          <div className="mt-6 flex flex-wrap items-center gap-4">
+            <Link href={`/events/${event.publicId}/edit`} className="text-sm font-medium text-brand-primary hover:underline">
+              {t("editEvent")}
+            </Link>
+            <ReportButton apiUrl={apiUrl} targetType="Event" targetId={event.id} />
+          </div>
 
           <EventActions apiUrl={apiUrl} eventId={event.id} createdById={event.createdById} />
         </div>

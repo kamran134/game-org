@@ -3,14 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
-import { fetchMe, type MeProfile } from "@/lib/authApi";
 import { getVenueModerationQueue, hideVenue, publishVenue, type VenueListItem } from "@/lib/venuesApi";
 
-export function ModerationQueue({ apiUrl }: { apiUrl: string }) {
+export function VenuePublishQueue({ apiUrl }: { apiUrl: string }) {
   const t = useTranslations("Moderation");
   const locale = useLocale();
 
-  const [me, setMe] = useState<MeProfile | null | undefined>(undefined);
   const [venues, setVenues] = useState<VenueListItem[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -22,14 +20,8 @@ export function ModerationQueue({ apiUrl }: { apiUrl: string }) {
   }, [apiUrl, locale, t]);
 
   useEffect(() => {
-    fetchMe(apiUrl, locale)
-      .then(setMe)
-      .catch(() => setMe(null));
-  }, [apiUrl, locale]);
-
-  useEffect(() => {
-    if (me && (me.role === "Moderator" || me.role === "Admin")) loadQueue();
-  }, [me, loadQueue]);
+    loadQueue();
+  }, [loadQueue]);
 
   async function handleAction(id: string, action: "publish" | "hide") {
     setBusyId(id);
@@ -44,15 +36,8 @@ export function ModerationQueue({ apiUrl }: { apiUrl: string }) {
     }
   }
 
-  if (me === undefined) return <p className="text-foreground/70">{t("loading")}</p>;
-  if (!me || (me.role !== "Moderator" && me.role !== "Admin")) {
-    return <p className="text-foreground/70">{t("noAccess")}</p>;
-  }
-
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="font-heading text-2xl font-semibold text-foreground">{t("pageTitle")}</h1>
-
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {venues === null ? (
