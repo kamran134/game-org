@@ -362,6 +362,68 @@ public static class VenuesEndpoints
         .RequireAuthorization("Moderator")
         .Produces(StatusCodes.Status404NotFound);
 
+        app.MapPost("/api/venues/{id:guid}/claims", async (
+            Guid id, CreateVenueClaimRequest request, ClaimsPrincipal principal, VenueService venueService, CancellationToken ct) =>
+        {
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            var (claim, error) = await venueService.CreateClaimAsync(id, userId.Value, request, ct);
+            if (error is not null)
+            {
+                var status = error == "Площадка не найдена." ? StatusCodes.Status404NotFound : StatusCodes.Status409Conflict;
+                return Results.Problem(error, statusCode: status);
+            }
+
+            return Results.Created($"/api/moderation/venue-claims/{claim!.Id}", new { claim.Id });
+        })
+        .WithName("CreateVenueClaim")
+        .WithTags("Venues")
+        .RequireAuthorization()
+        .Produces(StatusCodes.Status201Created)
+        .Produces(StatusCodes.Status404NotFound)
+        .Produces(StatusCodes.Status409Conflict);
+
+        app.MapGet("/api/moderation/venue-claims", async (HttpContext ctx, VenueService venueService, CancellationToken ct) =>
+        {
+            var locale = RequestLocale.Resolve(ctx.Request.Headers.AcceptLanguage.ToString());
+            return Results.Ok(await venueService.GetClaimQueueAsync(locale, ct));
+        })
+        .WithName("GetVenueClaimQueue")
+        .WithTags("Venues")
+        .RequireAuthorization("Moderator")
+        .Produces<List<VenueClaimDto>>();
+
+        app.MapPost("/api/moderation/venue-claims/{id:guid}/approve", async (Guid id, ClaimsPrincipal principal, VenueService venueService, CancellationToken ct) =>
+        {
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            var (ok, error) = await venueService.ApproveClaimAsync(id, userId.Value, ct);
+            var status = error == "Заявка не найдена." ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest;
+            return ok ? Results.NoContent() : Results.Problem(error, statusCode: status);
+        })
+        .WithName("ApproveVenueClaim")
+        .WithTags("Venues")
+        .RequireAuthorization("Moderator")
+        .Produces(StatusCodes.Status400BadRequest)
+        .Produces(StatusCodes.Status404NotFound);
+
+        app.MapPost("/api/moderation/venue-claims/{id:guid}/reject", async (Guid id, ClaimsPrincipal principal, VenueService venueService, CancellationToken ct) =>
+        {
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            var (ok, error) = await venueService.RejectClaimAsync(id, userId.Value, ct);
+            var status = error == "Заявка не найдена." ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest;
+            return ok ? Results.NoContent() : Results.Problem(error, statusCode: status);
+        })
+        .WithName("RejectVenueClaim")
+        .WithTags("Venues")
+        .RequireAuthorization("Moderator")
+        .Produces(StatusCodes.Status400BadRequest)
+        .Produces(StatusCodes.Status404NotFound);
+
         return app;
     }
 

@@ -178,6 +178,73 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage, 
         return (true, null);
     }
 
+    /// <summary>Заявка «это моя площадка» — 409, если пара Venue+User уже есть (unique-индекс это и так не
+    /// пустит, тут просто понятная ошибка вместо 500).</summary>
+    public async Task<(VenueClaim? Result, string? Error)> CreateClaimAsync(Guid venueId, Guid userId, CreateVenueClaimRequest request, CancellationToken ct)
+    {
+        var venue = await db.Venues.FirstOrDefaultAsync(v => v.Id == venueId, ct);
+        if (venue is null) return (null, "Площадка не найдена.");
+        if (venue.CreatedById == userId) return (null, "Вы уже владелец этой площадки.");
+        if (await db.VenueClaims.AnyAsync(c => c.VenueId == venueId && c.UserId == userId, ct))
+            return (null, "Вы уже подавали заявку на эту площадку.");
+
+        var claim = new VenueClaim { VenueId = venueId, UserId = userId, Evidence = request.Evidence };
+        db.VenueClaims.Add(claim);
+        await db.SaveChangesAsync(ct);
+        return (claim, null);
+    }
+
+    /// <summary>Только модератор/админ — очередь заявок на владение площадками.</summary>
+    public async Task<List<VenueClaimDto>> GetClaimQueueAsync(string locale, CancellationToken ct)
+    {
+        var claims = await db.VenueClaims
+            .Where(c => c.Status == ReportStatus.Open)
+            .Include(c => c.Venue)
+            .Include(c => c.User)
+            .OrderBy(c => c.CreatedAt)
+            .Take(50)
+            .ToListAsync(ct);
+
+        return claims.Select(c => new VenueClaimDto(
+            c.Id, c.VenueId, Localized.Resolve(c.Venue.NameI18n, locale) ?? c.Venue.Slug,
+            c.UserId, Localized.Resolve(c.User.DisplayNameI18n, locale) ?? c.User.Handle,
+            c.Evidence, c.Status, c.CreatedAt)).ToList();
+    }
+
+    /// <summary>Одобрение переносит владение: Venue.CreatedById = claim.UserId (решение пользователя, Шаг 10).</summary>
+    public async Task<(bool Ok, string? Error)> ApproveClaimAsync(Guid claimId, Guid resolverId, CancellationToken ct)
+    {
+        var claim = await db.VenueClaims.Include(c => c.Venue).FirstOrDefaultAsync(c => c.Id == claimId, ct);
+        if (claim is null) return (false, "Заявка не найдена.");
+        if (claim.Status != ReportStatus.Open) return (false, "Заявка уже обработана.");
+
+        claim.Status = ReportStatus.Resolved;
+        claim.ResolvedById = resolverId;
+        claim.ResolvedAt = DateTime.UtcNow;
+        var previousOwnerId = claim.Venue.CreatedById;
+        claim.Venue.CreatedById = claim.UserId;
+        claim.Venue.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        await auditLog.LogAsync(
+            resolverId, "venueclaim.approve", nameof(VenueClaim), claim.Id,
+            new { CreatedById = previousOwnerId }, new { CreatedById = claim.UserId }, ct);
+        return (true, null);
+    }
+
+    public async Task<(bool Ok, string? Error)> RejectClaimAsync(Guid claimId, Guid resolverId, CancellationToken ct)
+    {
+        var claim = await db.VenueClaims.FirstOrDefaultAsync(c => c.Id == claimId, ct);
+        if (claim is null) return (false, "Заявка не найдена.");
+        if (claim.Status != ReportStatus.Open) return (false, "Заявка уже обработана.");
+
+        claim.Status = ReportStatus.Rejected;
+        claim.ResolvedById = resolverId;
+        claim.ResolvedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        await auditLog.LogAsync(resolverId, "venueclaim.reject", nameof(VenueClaim), claim.Id, null, null, ct);
+        return (true, null);
+    }
+
     private VenueDetailDto MapDetail(Venue venue, string locale) => new(
         venue.Id, venue.Slug,
         Localized.Resolve(venue.NameI18n, locale) ?? "",
