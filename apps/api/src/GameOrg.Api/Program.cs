@@ -81,6 +81,7 @@ builder.Services.AddSingleton<R2StorageService>();
 builder.Services.AddScoped<VenueService>();
 builder.Services.AddScoped<EventService>();
 builder.Services.AddScoped<AuditLogService>();
+builder.Services.AddScoped<ReportService>();
 
 builder.Services.AddHttpClient<TelegramSender>();
 builder.Services.AddScoped<NotificationSender>();
@@ -203,6 +204,7 @@ app.MapSportsEndpoints();
 app.MapCitiesEndpoints();
 app.MapVenuesEndpoints();
 app.MapEventsEndpoints();
+app.MapModerationEndpoints();
 
 app.Run();
 
