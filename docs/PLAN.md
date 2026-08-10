@@ -882,6 +882,96 @@ Telegram Bot API (`sendMessage`), тем же `TELEGRAM_BOT_TOKEN`, которы
 
 ---
 
+### Шаг 11 — Уведомления: in-app список, настройки, новые типы событий
+
+Домен готов с Шага 2 (`Notification`, `NotificationPreference`, `DeviceToken`,
+`NotificationType`/`NotificationChannel`/`DeliveryStatus`), но: `(DedupeKey,
+Channel)` unique в БД никем не используется — `NotificationSender` пишет
+только `Channel = Telegram`; `NotificationPreference` никто не читает; из
+~15 значений `NotificationType` реально вызываются 4
+(`EventReminder24h/2h`, `EventCancelled`, `WaitlistPromoted`); читать
+уведомления (страница/список на сайте) негде — эндпоинта нет вообще.
+
+**Решения приняты пользователем (не пересматривать):**
+
+| Вопрос | Решение |
+|---|---|
+| Новые типы | `EventUpdated`, `ParticipantJoined`/`ParticipantLeft` + авто-переход в `EventConfirmed` |
+| In-app список | Делать сейчас — это главное в шаге |
+| Настройки (preferences) | Делать сейчас — простая страница вкл/выкл по типам |
+| Push (`DeviceToken`) | Вне охвата — отдельная инфраструктура (VAPID, service worker), не в этом шаге |
+
+`ClubInvite`/`ClubJoinRequest`/`NewFollower`/`MvpVoteOpen`/`ResultPosted` —
+не добавляются, для них нет ни `Clubs`, ни `Follow`, ни `MvpVote`/
+`EventResult` (см. Шаг 8, «вне охвата»). `PaymentDue`/`PaymentConfirmed` —
+аналогично, `Payment`-фичи ещё нет.
+
+`EventConfirmed` — **только вперёд**, без отката: если участник вышел и
+`ConfirmedCount` упал ниже `MinParticipants`, статус остаётся `Confirmed`.
+Причина: не дёргать статус туда-сюда и не спамить «событие снова не
+подтверждено» — организатор увидит упавший счётчик на странице и решит сам
+(отменить или ждать).
+
+#### Фаза 11.1 — `NotificationSender`: мультиканальность + preferences
+
+- `SendAsync` пишет **две** записи `Notification` на один повод: `InApp`
+  (всегда, сразу `Status = Sent` — читать её будет фронт, внешней доставки
+  не требует) и `Telegram` (как раньше, но только если
+  `NotificationPreference` не выключил её явно). `(DedupeKey, Channel)` —
+  разные `Channel` у двух строк с одинаковым `DedupeKey`, unique-индекс
+  этому не мешает, схема именно под это и рассчитана.
+- Новый приватный метод `IsChannelEnabledAsync(userId, type, channel)` —
+  **opt-out**: строки в `NotificationPreference` нет → включено по
+  умолчанию; есть строка с `Enabled = false` → выключено.
+
+#### Фаза 11.2 — Новые типы уведомлений в `EventService`
+
+- `RecomputeCountsAsync` — после пересчёта `ConfirmedCount`: если
+  `ev.Status == Scheduled`, `ev.MinParticipants != null` и `ConfirmedCount
+  >= MinParticipants` → `ev.Status = Confirmed`, разослать
+  `NotificationType.EventConfirmed` всем текущим `Confirmed`-участникам
+  (`DedupeKey: EVENT_CONFIRMED:{eventId}:{userId}`).
+- `JoinAsync` — после успешной записи уведомить создателя события
+  (`ParticipantJoined`, `DedupeKey` по `participant.Id` — свежий Guid на
+  каждый join, так что натурально не дублируется), кроме случая
+  «создатель записался сам на себя».
+- `LeaveAsync` — captured `participant.Id` до `Remove`, уведомить создателя
+  (`ParticipantLeft`), тот же принцип пропуска self-notify.
+- `UpdateAsync` — захватить `StartsAt`/`EndsAt`/`VenueId`/`CustomLocation`
+  до применения патча; если хоть одно поменялось — после сохранения
+  уведомить всех `Confirmed`+`Maybe` участников (`EventUpdated`,
+  `DedupeKey` с `ev.UpdatedAt.Ticks`, чтобы повторные правки тоже слали).
+
+#### Фаза 11.3 — Backend: чтение уведомлений
+
+- `Features/Notifications/` (новый слайс): `NotificationDtos.cs`,
+  `NotificationService.cs`, `NotificationsEndpoints.cs`.
+- `GET /api/notifications?unreadOnly=&skip=&take=` — только `Channel =
+  InApp`, свои, `CreatedAt desc`.
+- `GET /api/notifications/unread-count` — для бейджа в шапке.
+- `POST /api/notifications/{id}/read`, `POST /api/notifications/read-all`.
+
+#### Фаза 11.4 — Backend: настройки
+
+- `GET /api/me/notification-preferences` — все значения `NotificationType`
+  с текущим состоянием `Telegram`-канала (`true`, если строки нет).
+- `PUT /api/me/notification-preferences/{type}` — `{ enabled: bool }` для
+  канала `Telegram`, upsert.
+
+#### Фаза 11.5 — Frontend
+
+- `notificationsApi.ts` — список/непрочитанные/read/read-all/preferences.
+- `NotificationBell.tsx` в `UserMenu` — бейдж непрочитанных, дропдаун с
+  последними уведомлениями и ссылкой «Все уведомления».
+- `/notifications` — полный список с пагинацией, клик — mark read.
+- `/me/notifications` — переключатели по каждому `NotificationType`
+  (только `Telegram`-канал, `InApp` всегда включён — его нельзя выключить,
+  иначе колокольчик станет бесполезным).
+- i18n: человекочитаемые названия типов уведомлений (ru/az/en) — используются
+  и в списке, и в настройках.
+
+---
+
 ## 9. Конвенции
 
 **C#:** nullable reference types включены; `sealed` по умолчанию; async/await везде,
