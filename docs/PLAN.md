@@ -781,6 +781,107 @@ Telegram Bot API (`sendMessage`), тем же `TELEGRAM_BOT_TOKEN`, которы
 
 ---
 
+### Шаг 10 — Жалобы, заявки на площадки, аудит-лог
+
+Вынесено из Шага 9 (§703, «вне охвата»): `VenueClaim`, `Report`, `AuditLog` —
+домен и EF-конфиги есть с Шага 2, кода нет нигде (проверено — ни одного
+упоминания вне `Domain/`/`Infrastructure/Configurations`/миграций).
+
+**Решения приняты пользователем (не пересматривать):**
+
+| Вопрос | Решение |
+|---|---|
+| Одобрение `VenueClaim` | Владение переходит заявителю: `Venue.CreatedById = claim.UserId` |
+| Рассмотрение `Report` | Только очередь + статус (`Resolved`/`Rejected` + заметка), без авто-действий |
+| Цели жалоб | Все четыре: `Venue`, `Event`, `User` (профиль), `VenueReview` |
+| `AuditLog` | Только запись в этом шаге, страницы просмотра нет |
+
+Раз жалоба на пользователя не запускает никакого действия автоматически, а
+только очередь — модератору нужен *хоть какой-то* рычаг после её рассмотрения.
+Эндпоинта бана сейчас не существует (Шаг 9.1 добавил только *проверку* статуса
+при логине, не способ его выставить) — добавляется здесь же, иначе жалоба на
+юзера полностью бесполезна.
+
+#### Фаза 10.1 — Домен
+
+- `VenueClaim`: добавить `Guid? ResolvedById` + `User? ResolvedBy` (симметрично
+  `Report.ResolvedBy` — сейчас чинить некому). `HasOne(e => e.ResolvedBy)...
+  OnDelete(SetNull)`. Заодно сделать явной связь `Venue` в
+  `VenueClaimConfiguration` (сейчас неявная, по конвенции EF) — не трогать
+  поведение, просто явно.
+- Миграция `AddVenueClaimResolvedBy`, новая колонка nullable — по правилу
+  проекта не ломает существующие строки.
+- Новый enum не нужен — статусы `ReportStatus` уже подходят обеим сущностям.
+
+#### Фаза 10.2 — `AuditLogService` + ретрофит на Шаг 9
+
+- `Features/Moderation/AuditLogService.cs` (новый слайс — Report/AuditLog
+  режут поперёк Venues/Events/Profiles, в отличие от VenueClaim): `Task
+  LogAsync(Guid? actorId, string action, string entityType, Guid entityId,
+  object? before, object? after, CancellationToken ct)`. `before`/`after` —
+  JSON-круговорот через `System.Text.Json` в `Dictionary<string, object>?`
+  (колонка уже `jsonb`, конвертер общий `JsonConversions.For<T>()` уже есть в
+  Infrastructure — переиспользуется, не пишется заново).
+- `AddScoped<AuditLogService>()` в `Program.cs`.
+- Ретрофит вызовов в уже существующий код Шага 9 (не меняет их поведение,
+  только логирует): `VenueService.SetStatusAsync` → `venue.publish`/
+  `venue.hide`; `VenueService.DeleteAsync` → `venue.delete`;
+  `EventService.DeleteAsync` → `event.delete`.
+
+#### Фаза 10.3 — Жалобы (`Report`)
+
+- `Features/Moderation/ReportDtos.cs`: `ReportDto`, `CreateReportRequest`
+  (клиентский `TargetType` enum `Venue|Event|User|Review` + `TargetId` —
+  API-эргономика поверх денормализованных FK; `Reason: ReportReason`,
+  `Comment?`), `ResolveReportRequest` (`Status: Resolved|Rejected`,
+  `ResolutionNote?`).
+- `Features/Moderation/ReportService.cs`: `CreateAsync` (маппит `TargetType`
+  в нужную FK-колонку, `Status = Open`), `GetQueueAsync` (только
+  Moderator/Admin, `Open`/`InReview`, с человекочитаемым именем цели для
+  очереди), `ResolveAsync` (статус + `ResolvedById` + `ResolvedAt` +
+  `ResolutionNote`, лог `report.resolve`).
+- Минимальный рычаг для жалоб на пользователя — бана сейчас нет вообще:
+  `POST /api/moderation/users/{id}/ban` / `/unban`, `RequireAuthorization
+  ("Moderator")`, выставляет `UserStatus.Suspended`/`Active`, лог
+  `user.ban`/`user.unban`. Забанить Moderator/Admin может только Admin —
+  простая проверка роли цели перед сменой статуса.
+- `Features/Moderation/ModerationEndpoints.cs` (новый файл): `POST
+  /api/reports` (любой залогиненный), `GET /api/moderation/reports`
+  (Moderator), `POST /api/moderation/reports/{id}/resolve` (Moderator), плюс
+  бан/анбан выше.
+
+#### Фаза 10.4 — Заявки на площадки (`VenueClaim`)
+
+- `Features/Venues/VenueClaimDtos.cs` + методы в `VenueService.cs` (не новый
+  сервис — claim привязан к площадке, тот же слайс, что publish/hide из
+  Шага 9.2): `CreateClaimAsync` (409, если пара `VenueId+UserId` уже есть —
+  unique-индекс это и так не пустит, отдаём понятную ошибку вместо 500),
+  `GetClaimQueueAsync` (Moderator, `Open`), `ApproveClaimAsync` (статус
+  `Resolved` + `ResolvedById`/`ResolvedAt`, `venue.CreatedById =
+  claim.UserId`, лог `venueclaim.approve`), `RejectClaimAsync` (статус
+  `Rejected` + резолюция, лог `venueclaim.reject`).
+- Эндпоинты в `VenuesEndpoints.cs`: `POST /api/venues/{id}/claims`
+  (`RequireAuthorization()`), `GET /api/moderation/venue-claims` /
+  `POST .../{id}/approve` / `POST .../{id}/reject` (`"Moderator"`).
+
+#### Фаза 10.5 — Frontend
+
+- `apps/web/src/lib/moderationApi.ts` (новый) — жалобы + бан/анбан.
+  `venuesApi.ts` — claim-функции (по аналогии с уже существующим разделением
+  файлов по бэкенд-слайсам).
+- `ReportButton.tsx` — переиспользуемый клиентский компонент (кнопка +
+  инлайн-форма: причина из `ReportReason` + комментарий), подключается на
+  `/venues/[slug]`, `/events/[publicId]`, `/[handle]`, и в `ReviewsSection.tsx`
+  на каждый отзыв.
+- `VenueActions.tsx` — кнопка «Заявить права на площадку» для залогиненных
+  не-владельцев.
+- `/moderation` — расширяется вкладками/секциями: очередь жалоб (с
+  кнопкой бан/анбан на жалобах на пользователя) и очередь заявок на площадки
+  (Одобрить/Отклонить), рядом с уже существующей очередью публикации.
+- i18n-строки (az/ru/en): причины жалоб, статусы, заявка на площадку, бан.
+
+---
+
 ## 9. Конвенции
 
 **C#:** nullable reference types включены; `sealed` по умолчанию; async/await везде,
