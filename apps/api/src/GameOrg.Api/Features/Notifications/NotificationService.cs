@@ -1,4 +1,5 @@
 using GameOrg.Domain;
+using GameOrg.Domain.Entities;
 using GameOrg.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -41,5 +42,42 @@ public sealed class NotificationService(GameOrgDbContext db)
         await db.Notifications
             .Where(n => n.UserId == userId && n.Channel == NotificationChannel.InApp && n.ReadAt == null)
             .ExecuteUpdateAsync(setters => setters.SetProperty(n => n.ReadAt, now), ct);
+    }
+
+    /// <summary>Opt-out: строки нет → включено. Один и тот же принцип, что в NotificationSender.IsChannelEnabledAsync.</summary>
+    public async Task<List<NotificationPreferenceDto>> GetPreferencesAsync(Guid userId, CancellationToken ct)
+    {
+        var disabled = await db.NotificationPreferences
+            .Where(p => p.UserId == userId && p.Channel == NotificationChannel.Telegram && !p.Enabled)
+            .Select(p => p.Type)
+            .ToListAsync(ct);
+        var disabledSet = disabled.ToHashSet();
+
+        return Enum.GetValues<NotificationType>()
+            .Select(type => new NotificationPreferenceDto(type, !disabledSet.Contains(type)))
+            .ToList();
+    }
+
+    public async Task SetPreferenceAsync(Guid userId, NotificationType type, bool enabled, CancellationToken ct)
+    {
+        var pref = await db.NotificationPreferences
+            .FirstOrDefaultAsync(p => p.UserId == userId && p.Type == type && p.Channel == NotificationChannel.Telegram, ct);
+
+        if (pref is null)
+        {
+            db.NotificationPreferences.Add(new NotificationPreference
+            {
+                UserId = userId,
+                Type = type,
+                Channel = NotificationChannel.Telegram,
+                Enabled = enabled,
+            });
+        }
+        else
+        {
+            pref.Enabled = enabled;
+        }
+
+        await db.SaveChangesAsync(ct);
     }
 }

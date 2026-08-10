@@ -10,3 +10,8 @@ public sealed record NotificationDto(
     Dictionary<string, object>? Data,
     DateTime CreatedAt,
     DateTime? ReadAt);
+
+/// <summary>Только Telegram-канал в этом шаге — InApp всегда включён, его нельзя выключить (см. docs/PLAN.md, Шаг 11).</summary>
+public sealed record NotificationPreferenceDto(NotificationType Type, bool Enabled);
+
+public sealed record UpdateNotificationPreferenceRequest(bool Enabled);

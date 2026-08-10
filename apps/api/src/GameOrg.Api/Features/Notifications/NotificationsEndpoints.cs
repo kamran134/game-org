@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using GameOrg.Domain;
 
 namespace GameOrg.Api.Features.Notifications;
 
@@ -54,6 +55,31 @@ public static class NotificationsEndpoints
             return Results.NoContent();
         })
         .WithName("MarkAllNotificationsRead")
+        .WithTags("Notifications")
+        .RequireAuthorization();
+
+        app.MapGet("/api/me/notification-preferences", async (ClaimsPrincipal principal, NotificationService notificationService, CancellationToken ct) =>
+        {
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            return Results.Ok(await notificationService.GetPreferencesAsync(userId.Value, ct));
+        })
+        .WithName("GetNotificationPreferences")
+        .WithTags("Notifications")
+        .RequireAuthorization()
+        .Produces<List<NotificationPreferenceDto>>();
+
+        app.MapPut("/api/me/notification-preferences/{type}", async (
+            NotificationType type, UpdateNotificationPreferenceRequest request, ClaimsPrincipal principal, NotificationService notificationService, CancellationToken ct) =>
+        {
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            await notificationService.SetPreferenceAsync(userId.Value, type, request.Enabled, ct);
+            return Results.NoContent();
+        })
+        .WithName("UpdateNotificationPreference")
         .WithTags("Notifications")
         .RequireAuthorization();
 
