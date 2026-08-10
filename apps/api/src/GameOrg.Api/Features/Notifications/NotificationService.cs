@@ -44,6 +44,24 @@ public sealed class NotificationService(GameOrgDbContext db)
             .ExecuteUpdateAsync(setters => setters.SetProperty(n => n.ReadAt, now), ct);
     }
 
+    /// <summary>
+    /// Только реально вызываемые типы — остальные (ClubInvite, NewFollower, MvpVoteOpen...) числятся
+    /// в enum'е под ещё не построенные фичи (Clubs/Follow/MvpVote/Payment), показывать для них
+    /// переключатель было бы мёртвым UI. Список расширять по мере того, как эти типы начинают
+    /// реально отправляться в NotificationSender.SendAsync.
+    /// </summary>
+    private static readonly NotificationType[] WiredTypes =
+    [
+        NotificationType.EventReminder24h,
+        NotificationType.EventReminder2h,
+        NotificationType.EventUpdated,
+        NotificationType.EventCancelled,
+        NotificationType.EventConfirmed,
+        NotificationType.ParticipantJoined,
+        NotificationType.ParticipantLeft,
+        NotificationType.WaitlistPromoted,
+    ];
+
     /// <summary>Opt-out: строки нет → включено. Один и тот же принцип, что в NotificationSender.IsChannelEnabledAsync.</summary>
     public async Task<List<NotificationPreferenceDto>> GetPreferencesAsync(Guid userId, CancellationToken ct)
     {
@@ -53,7 +71,7 @@ public sealed class NotificationService(GameOrgDbContext db)
             .ToListAsync(ct);
         var disabledSet = disabled.ToHashSet();
 
-        return Enum.GetValues<NotificationType>()
+        return WiredTypes
             .Select(type => new NotificationPreferenceDto(type, !disabledSet.Contains(type)))
             .ToList();
     }

@@ -80,6 +80,13 @@ export function MeView({ apiUrl }: { apiUrl: string }) {
             <dd>{tVisibility(profile.profileVisibility)}</dd>
           </div>
         </dl>
+
+        <Link
+          href="/me/notifications"
+          className="mt-4 inline-block text-sm font-medium text-brand-primary hover:underline"
+        >
+          {t("notificationSettings")}
+        </Link>
       </div>
 
       {isModerator && (

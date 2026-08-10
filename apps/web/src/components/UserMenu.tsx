@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { SignOut } from "@phosphor-icons/react";
 import { Link, useRouter } from "@/i18n/navigation";
 import { fetchMe, logout, type MeProfile } from "@/lib/authApi";
+import { NotificationBell } from "@/components/NotificationBell";
 
 // undefined — ещё грузим (заглушка ниже, чтобы шапка не прыгала), null — не
 // вошёл, MeProfile — вошёл. Три состояния, три разных исхода, boolean/null
@@ -44,6 +45,7 @@ export function UserMenu({ apiUrl }: { apiUrl: string }) {
 
   return (
     <div className="flex items-center gap-3">
+      <NotificationBell apiUrl={apiUrl} />
       {(profile.role === "Moderator" || profile.role === "Admin") && (
         <Link
           href="/moderation"

@@ -72,6 +72,7 @@
   "Me": {
     "pageTitle": "Mənim profilim",
     "editProfile": "Profili redaktə et",
+    "notificationSettings": "Bildiriş ayarları",
     "loading": "Yüklənir…",
     "fields": {
       "name": "Ad",
@@ -323,6 +324,31 @@
       "WrongInfo": "Yanlış məlumat",
       "InappropriateContent": "Uyğunsuz məzmun",
       "Other": "Digər"
+    }
+  },
+  "Notifications": {
+    "bell": "Bildirişlər",
+    "title": "Bildirişlər",
+    "markAllRead": "Hamısını oxunmuş kimi işarələ",
+    "loading": "Yüklənir…",
+    "empty": "Hələ bildiriş yoxdur.",
+    "viewAll": "Bütün bildirişlər",
+    "pageTitle": "Bildirişlər",
+    "loadError": "Bildirişlər yüklənmədi",
+    "saveError": "Ayar yadda saxlanmadı",
+    "loadMore": "Daha çox göstər",
+    "preferencesTitle": "Bildiriş ayarları",
+    "preferencesSubtitle": "Telegram-a nə göndərilsin. Tətbiqdəki bildirişlər həmişə görünür — onları söndürmək olmaz.",
+    "backToProfile": "Mənim profilim",
+    "types": {
+      "EventReminder24h": "Oyundan 24 saat əvvəl xatırlatma",
+      "EventReminder2h": "Oyundan 2 saat əvvəl xatırlatma",
+      "EventUpdated": "Tədbirin vaxtı və ya yeri dəyişdi",
+      "EventCancelled": "Tədbir ləğv edildi",
+      "EventConfirmed": "Tədbir təsdiqləndi (minimum iştirakçı toplandı)",
+      "ParticipantJoined": "Mənim tədbirimə yeni qeydiyyat",
+      "ParticipantLeft": "Mənim tədbirimdən qeydiyyatın ləğvi",
+      "WaitlistPromoted": "Gözləmə siyahısından iştirakçıya keçid"
     }
   }
 }
