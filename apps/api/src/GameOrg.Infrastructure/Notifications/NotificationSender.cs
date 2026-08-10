@@ -7,16 +7,47 @@ namespace GameOrg.Infrastructure.Notifications;
 /// <summary>
 /// Общая точка для "написать Notification и сразу попытаться отправить" —
 /// используется и немедленной отправкой (EventService: отмена события,
-/// повышение из вейтлиста), и плановой (EventReminderJob). Идемпотентно по
-/// DedupeKey: если запись с таким ключом уже есть, второй раз не шлёт.
+/// повышение из вейтлиста), и плановой (EventReminderJob). На один повод
+/// пишет две записи — InApp (всегда, сразу Sent — читает её фронт) и
+/// Telegram (только если NotificationPreference не выключил канал явно).
+/// (DedupeKey, Channel) unique в БД — разные Channel у одного DedupeKey не
+/// конфликтуют, схема именно под этот fan-out и рассчитана (Шаг 11).
 /// </summary>
 public sealed class NotificationSender(GameOrgDbContext db, TelegramSender telegramSender)
 {
     public async Task SendAsync(
         Guid userId, NotificationType type, string dedupeKey, string text, Dictionary<string, object>? data, CancellationToken ct)
     {
-        var exists = await db.Notifications.AnyAsync(n => n.DedupeKey == dedupeKey, ct);
+        await SendInAppAsync(userId, type, dedupeKey, text, data, ct);
+        await SendTelegramAsync(userId, type, dedupeKey, text, data, ct);
+    }
+
+    private async Task SendInAppAsync(
+        Guid userId, NotificationType type, string dedupeKey, string text, Dictionary<string, object>? data, CancellationToken ct)
+    {
+        var exists = await db.Notifications.AnyAsync(n => n.DedupeKey == dedupeKey && n.Channel == NotificationChannel.InApp, ct);
         if (exists) return;
+
+        db.Notifications.Add(new Notification
+        {
+            UserId = userId,
+            Type = type,
+            Channel = NotificationChannel.InApp,
+            Body = text,
+            Data = data,
+            DedupeKey = dedupeKey,
+            Status = DeliveryStatus.Sent,
+            SentAt = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync(ct);
+    }
+
+    private async Task SendTelegramAsync(
+        Guid userId, NotificationType type, string dedupeKey, string text, Dictionary<string, object>? data, CancellationToken ct)
+    {
+        var exists = await db.Notifications.AnyAsync(n => n.DedupeKey == dedupeKey && n.Channel == NotificationChannel.Telegram, ct);
+        if (exists) return;
+        if (!await IsChannelEnabledAsync(userId, type, NotificationChannel.Telegram, ct)) return;
 
         var notification = new Notification
         {
@@ -49,5 +80,13 @@ public sealed class NotificationSender(GameOrgDbContext db, TelegramSender teleg
         notification.SentAt = sent ? DateTime.UtcNow : null;
         notification.Error = sent ? null : "Не удалось отправить сообщение в Telegram.";
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Opt-out: строки в NotificationPreference нет → канал включён по умолчанию.</summary>
+    private async Task<bool> IsChannelEnabledAsync(Guid userId, NotificationType type, NotificationChannel channel, CancellationToken ct)
+    {
+        var pref = await db.NotificationPreferences
+            .FirstOrDefaultAsync(p => p.UserId == userId && p.Type == type && p.Channel == channel, ct);
+        return pref?.Enabled ?? true;
     }
 }
