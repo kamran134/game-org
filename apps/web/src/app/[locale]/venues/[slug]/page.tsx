@@ -9,6 +9,7 @@ import { PhotoGallery } from "./PhotoGallery";
 import { VenueActions } from "./VenueActions";
 import { DraftVenueGate } from "./DraftVenueGate";
 import { ReportButton } from "@/components/ReportButton";
+import { FollowButton } from "@/components/FollowButton";
 
 export const dynamic = "force-dynamic";
 
@@ -137,7 +138,10 @@ export default async function VenuePage({ params }: { params: Promise<{ locale: 
 
           <VenueActions apiUrl={apiUrl} venueId={venue.id} createdById={venue.createdById} status={venue.status} />
 
+          <p className="mt-4 text-sm text-foreground/60">{t("followersCount", { count: venue.followersCount })}</p>
+
           <div className="mt-6 flex flex-wrap items-center gap-4">
+            <FollowButton apiUrl={apiUrl} targetType="Venue" targetId={venue.id} />
             <Link href={`/venues/${venue.slug}/edit`} className="text-sm font-medium text-brand-primary hover:underline">
               {t("editVenue")}
             </Link>

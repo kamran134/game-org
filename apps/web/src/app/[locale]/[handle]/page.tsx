@@ -4,8 +4,9 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { MapPinLine } from "@phosphor-icons/react/dist/ssr";
 import { createApiClient } from "@/lib/apiClient";
 import { routing } from "@/i18n/routing";
-import { getPathname } from "@/i18n/navigation";
+import { Link, getPathname } from "@/i18n/navigation";
 import { ReportButton } from "@/components/ReportButton";
+import { FollowButton } from "@/components/FollowButton";
 
 export const dynamic = "force-dynamic";
 
@@ -67,11 +68,15 @@ export default async function PublicProfilePage({
 
   const cityName = profile.city?.nameI18n?.additionalData?.[locale] as string | undefined;
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5100";
-  // PublicProfileDto.Id — новое поле с Шага 10, добавлено на бэкенде, но
-  // Kiota-клиент здесь не перегенерировать (требует живой API+БД). Kiota
-  // кладёт нераспознанные top-level свойства в additionalData вместо того,
-  // чтобы их терять — тот же механизм, что уже используется для nameI18n.
+  // PublicProfileDto.Id/FollowersCount — новые поля, добавлены на бэкенде
+  // позже, чем сгенерирован Kiota-клиент (требует живой API+БД, здесь
+  // недоступно). Kiota кладёт нераспознанные top-level свойства в
+  // additionalData вместо того, чтобы их терять — тот же механизм, что уже
+  // используется для nameI18n. ViewerIsFollowing сюда не тащим — этот
+  // анонимный SSR-запрос без cookie всегда возвращал бы false, реальное
+  // состояние подписки FollowButton определяет сам на клиенте.
   const profileId = profile.additionalData?.id as string | undefined;
+  const followersCount = profile.additionalData?.followersCount as number | undefined;
 
   return (
     <main className="flex-1 bg-brand-background px-6 py-16">
@@ -86,8 +91,19 @@ export default async function PublicProfilePage({
               {cityName ?? profile.city.slug}
             </p>
           )}
+          <p className="mt-3 flex items-center gap-3 text-sm text-foreground/60">
+            {followersCount != null && (
+              <Link href={`/${handle}/followers`} className="hover:text-foreground hover:underline">
+                {t("followersCount", { count: followersCount })}
+              </Link>
+            )}
+            <Link href={`/${handle}/following`} className="hover:text-foreground hover:underline">
+              {t("followingLink")}
+            </Link>
+          </p>
           {profileId && (
-            <div className="mt-4">
+            <div className="mt-4 flex flex-wrap items-center gap-4">
+              <FollowButton apiUrl={apiUrl} targetType="User" targetId={profileId} />
               <ReportButton apiUrl={apiUrl} targetType="User" targetId={profileId} />
             </div>
           )}

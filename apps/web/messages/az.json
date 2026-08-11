@@ -21,7 +21,8 @@
     "close": "Bağla",
     "settings": "Ayarlar",
     "language": "Dil",
-    "theme": "Tema"
+    "theme": "Tema",
+    "feed": "Lenta"
   },
   "Landing": {
     "badge": "game.org.az — Azərbaycan üçün idman sosial şəbəkəsi",
@@ -113,7 +114,8 @@
   },
   "Profile": {
     "notFound": "Profil tapılmadı",
-    "descriptionFallback": "{name} oyunçusunun game.org.az-dakı profili"
+    "descriptionFallback": "{name} oyunçusunun game.org.az-dakı profili",
+    "followersCount": "{count} izləyici"
   },
   "Sports": {
     "pageTitle": "İdman növləri"
@@ -129,6 +131,7 @@
     "distanceKm": "{km} km",
     "backToList": "Bütün meydançalar",
     "notFound": "Meydança tapılmadı",
+    "followersCount": "{count} izləyici",
     "noAccessEdit": "Yalnız meydançanı yaradan şəxs redaktə edə bilər.",
     "loginRequired": "Meydança əlavə etmək üçün əvvəlcə daxil olun.",
     "editVenue": "Meydançanı redaktə et",
@@ -372,6 +375,7 @@
     "deleteConfirm": "Klubu silmək istəyirsiniz? Bu əməliyyat geri qaytarılmır.",
     "manageMembers": "İştirakçılar",
     "membersCount": "{count} iştirakçı",
+    "followersCount": "{count} izləyici",
     "statusPending": "Sorğu baxılır",
     "join": "Qoşul",
     "requestJoin": "Sorğu göndər",
@@ -424,5 +428,39 @@
     "removeMember": "Sil",
     "removeMemberConfirm": "İştirakçını klubdan silmək istəyirsiniz?",
     "transferOwnershipConfirm": "Klubun sahibliyini bu iştirakçıya vermək istəyirsiniz? Siz admin olacaqsınız."
+  },
+  "Social": {
+    "follow": "İzlə",
+    "following": "İzləyirsiniz",
+    "actionError": "Əməliyyat uğursuz oldu",
+    "feedTitle": "Lenta",
+    "loginRequired": "Lentanı görmək üçün əvvəlcə daxil olun.",
+    "loginLink": "Daxil ol",
+    "loading": "Yüklənir…",
+    "empty": "Lenta hələ boşdur — kiməsə izləyin.",
+    "emptyVenuesLink": "Meydançalar",
+    "emptyClubsLink": "Klublar",
+    "loadMore": "Daha çox göstər",
+    "loadError": "Lentanı yükləmək mümkün olmadı",
+    "followersTitle": "İzləyicilər",
+    "noFollowers": "Hələ izləyici yoxdur.",
+    "followingTitle": "İzlədikləri",
+    "noFollowing": "Hələ heç kimi izləmir.",
+    "followingLink": "İzlədikləri",
+    "targetType": {
+      "User": "oyunçu",
+      "Club": "klub",
+      "Venue": "meydança"
+    },
+    "activity": {
+      "createdEvent": "tədbir yaratdı",
+      "joinedEvent": "qeydiyyatdan keçdi:",
+      "createdClub": "klub yaratdı",
+      "joinedClub": "kluba qoşuldu",
+      "reviewedVenue": "meydança haqqında rəy yazdı",
+      "addedSport": "profilinə yeni idman növü əlavə etdi",
+      "other": "yeni fəaliyyət",
+      "untitledEvent": "tədbir"
+    }
   }
 }

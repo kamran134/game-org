@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Users, MapPinLine, Copy } from "@phosphor-icons/react";
 import { Link, useRouter } from "@/i18n/navigation";
+import { FollowButton } from "@/components/FollowButton";
 import {
   deleteClub,
   getClubAuthed,
@@ -94,6 +95,7 @@ export function ClubView({ apiUrl, locale, slug }: { apiUrl: string; locale: str
                 <Users size={16} weight="bold" />
                 {t("membersCount", { count: club.membersCount })}
               </p>
+              <p className="mt-1 text-sm text-foreground/60">{t("followersCount", { count: club.followersCount })}</p>
               {club.city && (
                 <p className="mt-1 flex items-center gap-1.5 text-sm text-foreground/60">
                   <MapPinLine size={16} weight="bold" />
@@ -123,6 +125,15 @@ export function ClubView({ apiUrl, locale, slug }: { apiUrl: string; locale: str
           {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
           <div className="mt-6 flex flex-wrap items-center gap-4">
+            <FollowButton
+              apiUrl={apiUrl}
+              targetType="Club"
+              targetId={club.id}
+              initialIsFollowing={club.viewerIsFollowing}
+              onChange={(following) =>
+                setClub((c) => (c ? { ...c, viewerIsFollowing: following, followersCount: c.followersCount + (following ? 1 : -1) } : c))
+              }
+            />
             {!isMember && club.viewerStatus !== "Pending" && (
               <button
                 type="button"

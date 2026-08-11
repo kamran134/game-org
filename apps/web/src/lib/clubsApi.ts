@@ -42,6 +42,8 @@ export type ClubDetail = {
   inviteCode?: string | null;
   viewerRole?: ClubRole | null;
   viewerStatus?: MembershipStatus | null;
+  followersCount: number;
+  viewerIsFollowing: boolean;
   sports: ClubSportItem[];
   // Резолвнутые name/description выше — для просмотра. Эти два — сырые
   // словари по всем языкам, только для формы редактирования.

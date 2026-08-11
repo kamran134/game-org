@@ -21,7 +21,8 @@
     "close": "Close",
     "settings": "Settings",
     "language": "Language",
-    "theme": "Theme"
+    "theme": "Theme",
+    "feed": "Feed"
   },
   "Landing": {
     "badge": "game.org.az — a sports social network for Azerbaijan",
@@ -113,7 +114,8 @@
   },
   "Profile": {
     "notFound": "Profile not found",
-    "descriptionFallback": "{name}'s player profile on game.org.az"
+    "descriptionFallback": "{name}'s player profile on game.org.az",
+    "followersCount": "{count} followers"
   },
   "Sports": {
     "pageTitle": "Sports"
@@ -129,6 +131,7 @@
     "distanceKm": "{km} km",
     "backToList": "All venues",
     "notFound": "Venue not found",
+    "followersCount": "{count} followers",
     "noAccessEdit": "Only the venue's creator can edit it.",
     "loginRequired": "Sign in first to add a venue.",
     "editVenue": "Edit venue",
@@ -372,6 +375,7 @@
     "deleteConfirm": "Delete this club? This cannot be undone.",
     "manageMembers": "Members",
     "membersCount": "{count} members",
+    "followersCount": "{count} followers",
     "statusPending": "Request pending",
     "join": "Join",
     "requestJoin": "Request to join",
@@ -424,5 +428,39 @@
     "removeMember": "Remove",
     "removeMemberConfirm": "Remove this member from the club?",
     "transferOwnershipConfirm": "Transfer club ownership to this member? You'll become an admin."
+  },
+  "Social": {
+    "follow": "Follow",
+    "following": "Following",
+    "actionError": "Couldn't complete the action",
+    "feedTitle": "Feed",
+    "loginRequired": "Log in to see your feed.",
+    "loginLink": "Log in",
+    "loading": "Loading…",
+    "empty": "Your feed is empty — follow someone to get started.",
+    "emptyVenuesLink": "Venues",
+    "emptyClubsLink": "Clubs",
+    "loadMore": "Load more",
+    "loadError": "Couldn't load the feed",
+    "followersTitle": "Followers",
+    "noFollowers": "No followers yet.",
+    "followingTitle": "Following",
+    "noFollowing": "Not following anyone yet.",
+    "followingLink": "Following",
+    "targetType": {
+      "User": "player",
+      "Club": "club",
+      "Venue": "venue"
+    },
+    "activity": {
+      "createdEvent": "created an event",
+      "joinedEvent": "joined",
+      "createdClub": "created a club",
+      "joinedClub": "joined a club",
+      "reviewedVenue": "reviewed a venue",
+      "addedSport": "added a new sport to their profile",
+      "other": "new activity",
+      "untitledEvent": "an event"
+    }
   }
 }

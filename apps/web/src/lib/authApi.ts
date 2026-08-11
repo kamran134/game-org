@@ -41,6 +41,8 @@ export type MeProfile = {
   isVerified: boolean;
   role: UserRole;
   sports: UserSport[];
+  followersCount: number;
+  followingCount: number;
   // Резолвнутые displayName/bio выше — для отображения. Эти два — сырые
   // словари по всем языкам, только для формы редактирования (/me).
   displayNameI18n: LocalizedText;

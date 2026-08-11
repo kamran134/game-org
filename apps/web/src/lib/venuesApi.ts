@@ -74,6 +74,8 @@ export type VenueDetail = {
   eventsCount: number;
   createdById?: string | null;
   status: VenueStatus;
+  followersCount: number;
+  viewerIsFollowing: boolean;
   sports: VenueSportItem[];
   photos: VenuePhoto[];
   // Резолвнутые name/description/address выше — для страницы просмотра. Эти

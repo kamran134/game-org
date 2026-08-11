@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { SignOut } from "@phosphor-icons/react";
+import { SignOut, Rss } from "@phosphor-icons/react";
 import { Link, useRouter } from "@/i18n/navigation";
 import { fetchMe, logout, type MeProfile } from "@/lib/authApi";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -45,6 +45,14 @@ export function UserMenu({ apiUrl }: { apiUrl: string }) {
 
   return (
     <div className="flex items-center gap-3">
+      <Link
+        href="/feed"
+        aria-label={t("feed")}
+        title={t("feed")}
+        className="flex h-6 w-6 items-center justify-center text-foreground/60 transition-colors duration-200 hover:text-foreground"
+      >
+        <Rss size={17} weight="bold" />
+      </Link>
       <NotificationBell apiUrl={apiUrl} />
       {(profile.role === "Moderator" || profile.role === "Admin") && (
         <Link
