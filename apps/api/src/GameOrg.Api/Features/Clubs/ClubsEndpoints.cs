@@ -10,7 +10,7 @@ public static class ClubsEndpoints
     public static IEndpointRouteBuilder MapClubsEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/clubs", async (
-            HttpContext ctx, ClaimsPrincipal principal, Guid? cityId, Guid? sportId, ClubKind? kind, bool onlyMine, ClubService clubService, CancellationToken ct) =>
+            HttpContext ctx, ClaimsPrincipal principal, Guid? cityId, Guid? sportId, ClubKind? kind, ClubService clubService, CancellationToken ct, bool onlyMine = false) =>
         {
             var locale = RequestLocale.ResolveAndVary(ctx);
             var clubs = await clubService.GetListAsync(locale, GetUserId(principal), cityId, sportId, kind, onlyMine, ct);
