@@ -139,6 +139,8 @@ public sealed class EventService(
             .Include(e => e.Sport)
             .Include(e => e.Venue)
             .Include(e => e.Participants).ThenInclude(p => p.User)
+            .Include(e => e.Teams)
+            .Include(e => e.Result)
             .FirstOrDefaultAsync(e => e.PublicId == publicId, ct);
 
         if (ev is null) return null;
@@ -150,7 +152,236 @@ public sealed class EventService(
             if (!isMember) return null;
         }
 
-        return MapDetail(ev, locale);
+        var mvpTally = await GetMvpTallyAsync(ev.Id, locale, ct);
+        var myVote = viewerId is null
+            ? null
+            : await db.MvpVotes.Where(v => v.EventId == ev.Id && v.VoterId == viewerId).Select(v => (Guid?)v.TargetUserId).FirstOrDefaultAsync(ct);
+
+        string? mvpDisplayName = null;
+        if (ev.Result?.MvpUserId is Guid mvpId)
+        {
+            var mvpUser = ev.Participants.FirstOrDefault(p => p.UserId == mvpId)?.User;
+            mvpDisplayName = mvpUser is not null ? Localized.Resolve(mvpUser.DisplayNameI18n, locale) : null;
+        }
+
+        return MapDetail(ev, locale, mvpDisplayName, mvpTally, myVote);
+    }
+
+    /// <summary>
+    /// Только участники с UserId (не гости), голосовавшие — от нуля и выше. Используется и для
+    /// EventDetailDto.MvpTally (все видят), и для авторезолва MvpUserId в RecordResultAsync.
+    /// </summary>
+    private async Task<List<MvpTallyEntryDto>> GetMvpTallyAsync(Guid eventId, string locale, CancellationToken ct)
+    {
+        var raw = await db.MvpVotes
+            .Where(v => v.EventId == eventId)
+            .GroupBy(v => v.TargetUserId)
+            .Select(g => new { UserId = g.Key, Votes = g.Count() })
+            .OrderByDescending(g => g.Votes)
+            .ToListAsync(ct);
+
+        if (raw.Count == 0) return [];
+
+        var userIds = raw.Select(r => r.UserId).ToList();
+        var users = await db.Users.Where(u => userIds.Contains(u.Id)).Select(u => new { u.Id, u.Handle, u.DisplayNameI18n }).ToListAsync(ct);
+        var byId = users.ToDictionary(u => u.Id);
+
+        return raw.Select(r => new MvpTallyEntryDto(
+            r.UserId,
+            byId.TryGetValue(r.UserId, out var u) ? Localized.Resolve(u.DisplayNameI18n, locale) ?? u.Handle : "",
+            r.Votes)).ToList();
+    }
+
+    /// <summary>Создатель или модератор, только после EndsAt — иначе непонятно, что вообще завершать.</summary>
+    public async Task<(bool Ok, string? Error)> CompleteAsync(Guid eventId, Guid userId, bool isModerator, CancellationToken ct)
+    {
+        var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == eventId, ct);
+        if (ev is null) return (false, "Событие не найдено.");
+        if (ev.CreatedById != userId && !isModerator) return (false, "Завершить может только создатель или модератор.");
+        if (ev.Status is not (EventStatus.Scheduled or EventStatus.Confirmed))
+            return (false, "Завершить можно только запланированное или подтверждённое событие.");
+        if (DateTime.UtcNow < ev.EndsAt) return (false, "Событие ещё не закончилось.");
+
+        ev.Status = EventStatus.Completed;
+        ev.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        if (ev.Visibility == EventVisibility.Public)
+            await activityService.EmitAsync(userId, ActivityVerb.CompletedEvent, ev.Id, null, null, null, ct);
+
+        var participantUserIds = await db.EventParticipants
+            .Where(p => p.EventId == eventId && p.UserId != null && (p.Status == ParticipationStatus.Confirmed || p.Status == ParticipationStatus.Attended))
+            .Select(p => p.UserId!.Value)
+            .ToListAsync(ct);
+
+        foreach (var participantUserId in participantUserIds)
+        {
+            await notificationSender.SendAsync(
+                participantUserId,
+                NotificationType.MvpVoteOpen,
+                $"MVP_VOTE_OPEN:{eventId}:{participantUserId}",
+                "Событие завершено — проголосуйте за MVP.",
+                new Dictionary<string, object> { ["eventId"] = eventId.ToString() },
+                ct);
+        }
+
+        return (true, null);
+    }
+
+    /// <summary>
+    /// Полная замена состава — как club.Sports.Clear()+Add в ClubService. Обнуляет TeamId у всех
+    /// участников события ExecuteUpdateAsync'ом до удаления старых команд — иначе осиротевшие
+    /// ссылки на уже удалённые EventTeam.
+    /// </summary>
+    public async Task<(bool Ok, string? Error)> SetTeamsAsync(Guid eventId, Guid userId, bool isModerator, SetTeamsRequest request, CancellationToken ct)
+    {
+        var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == eventId, ct);
+        if (ev is null) return (false, "Событие не найдено.");
+        if (ev.CreatedById != userId && !isModerator) return (false, "Управлять командами может только создатель или модератор.");
+
+        var participantIds = request.Teams.SelectMany(t => t.ParticipantIds).ToList();
+        if (participantIds.Count != participantIds.Distinct().Count())
+            return (false, "Участник не может быть в двух командах одновременно.");
+
+        if (participantIds.Count > 0)
+        {
+            var validCount = await db.EventParticipants.CountAsync(p => p.EventId == eventId && participantIds.Contains(p.Id), ct);
+            if (validCount != participantIds.Count) return (false, "Один или несколько участников не относятся к этому событию.");
+        }
+
+        var existingTeams = await db.EventTeams.Where(t => t.EventId == eventId).ToListAsync(ct);
+        db.EventTeams.RemoveRange(existingTeams);
+
+        await db.EventParticipants.Where(p => p.EventId == eventId && p.TeamId != null)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.TeamId, (Guid?)null), ct);
+
+        var teams = request.Teams
+            .Select(t => new EventTeam { EventId = eventId, Name = t.Name, ColorHex = t.ColorHex, SortOrder = t.SortOrder })
+            .ToList();
+        db.EventTeams.AddRange(teams);
+        await db.SaveChangesAsync(ct);
+
+        for (var i = 0; i < request.Teams.Count; i++)
+        {
+            var memberIds = request.Teams[i].ParticipantIds;
+            if (memberIds.Count == 0) continue;
+
+            var teamId = teams[i].Id;
+            await db.EventParticipants.Where(p => memberIds.Contains(p.Id)).ExecuteUpdateAsync(s => s.SetProperty(p => p.TeamId, teamId), ct);
+        }
+
+        return (true, null);
+    }
+
+    /// <summary>Голосуют только участники события (не гости) друг за друга, только после Completed. Повторный голос меняет цель.</summary>
+    public async Task<(bool Ok, string? Error)> VoteMvpAsync(Guid eventId, Guid voterId, Guid targetUserId, CancellationToken ct)
+    {
+        if (voterId == targetUserId) return (false, "Нельзя голосовать за самого себя.");
+
+        var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == eventId, ct);
+        if (ev is null) return (false, "Событие не найдено.");
+        if (ev.Status != EventStatus.Completed) return (false, "Голосование открывается после завершения события.");
+
+        var voterIsParticipant = await db.EventParticipants.AnyAsync(p => p.EventId == eventId && p.UserId == voterId, ct);
+        if (!voterIsParticipant) return (false, "Голосовать может только участник события.");
+
+        var targetIsParticipant = await db.EventParticipants.AnyAsync(p => p.EventId == eventId && p.UserId == targetUserId, ct);
+        if (!targetIsParticipant) return (false, "Голосовать можно только за участника события.");
+
+        var existing = await db.MvpVotes.FirstOrDefaultAsync(v => v.EventId == eventId && v.VoterId == voterId, ct);
+        if (existing is null)
+            db.MvpVotes.Add(new MvpVote { EventId = eventId, VoterId = voterId, TargetUserId = targetUserId });
+        else
+            existing.TargetUserId = targetUserId;
+
+        await db.SaveChangesAsync(ct);
+        return (true, null);
+    }
+
+    /// <summary>
+    /// Создатель/модератор, только для Completed. MvpUserId в запросе — явное переопределение,
+    /// не передан — берётся победитель голосования на момент записи (GetMvpTallyAsync, первая
+    /// строка — уже отсортирована по убыванию голосов). EventResult.EventId — PK, поэтому повторный
+    /// вызов редактирует уже записанный результат, а не 409-ит.
+    /// </summary>
+    public async Task<(bool Ok, string? Error)> RecordResultAsync(Guid eventId, Guid userId, bool isModerator, RecordResultRequest request, CancellationToken ct)
+    {
+        var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == eventId, ct);
+        if (ev is null) return (false, "Событие не найдено.");
+        if (ev.CreatedById != userId && !isModerator) return (false, "Записать результат может только создатель или модератор.");
+        if (ev.Status != EventStatus.Completed) return (false, "Результат можно записать только для завершённого события.");
+
+        if (request.TeamScores is { Count: > 0 })
+        {
+            var teamIds = request.TeamScores.Select(s => s.TeamId).ToList();
+            var validTeamCount = await db.EventTeams.CountAsync(t => t.EventId == eventId && teamIds.Contains(t.Id), ct);
+            if (validTeamCount != teamIds.Distinct().Count()) return (false, "Одна или несколько команд не относятся к этому событию.");
+
+            foreach (var scoreEntry in request.TeamScores)
+                await db.EventTeams.Where(t => t.Id == scoreEntry.TeamId).ExecuteUpdateAsync(s => s.SetProperty(t => t.Score, scoreEntry.Score), ct);
+        }
+
+        if (request.Attendance is { Count: > 0 })
+        {
+            if (request.Attendance.Any(a => a.Status is not (ParticipationStatus.Attended or ParticipationStatus.NoShow or ParticipationStatus.LateCancel)))
+                return (false, "Отметка посещаемости — только Attended, NoShow или LateCancel.");
+
+            var participantIds = request.Attendance.Select(a => a.ParticipantId).ToList();
+            var validParticipantCount = await db.EventParticipants.CountAsync(p => p.EventId == eventId && participantIds.Contains(p.Id), ct);
+            if (validParticipantCount != participantIds.Distinct().Count()) return (false, "Один или несколько участников не относятся к этому событию.");
+
+            var now = DateTime.UtcNow;
+            foreach (var entry in request.Attendance)
+            {
+                await db.EventParticipants.Where(p => p.Id == entry.ParticipantId)
+                    .ExecuteUpdateAsync(s => s.SetProperty(p => p.Status, entry.Status).SetProperty(p => p.StatusChangedAt, now), ct);
+            }
+        }
+
+        var mvpUserId = request.MvpUserId;
+        if (mvpUserId is null)
+        {
+            var tally = await GetMvpTallyAsync(eventId, RequestLocale.Default, ct);
+            mvpUserId = tally.Count > 0 ? tally[0].UserId : null;
+        }
+
+        var result = await db.EventResults.FirstOrDefaultAsync(r => r.EventId == eventId, ct);
+        if (result is null)
+        {
+            result = new EventResult { EventId = eventId };
+            db.EventResults.Add(result);
+        }
+
+        result.Summary = request.Summary;
+        result.Standings = request.Standings?.Select(s =>
+        {
+            var entry = new Dictionary<string, object> { ["userId"] = s.UserId.ToString(), ["place"] = s.Place };
+            if (s.Score is not null) entry["score"] = s.Score.Value;
+            return entry;
+        }).ToList();
+        result.MvpUserId = mvpUserId;
+        result.RecordedById = userId;
+        result.RecordedAt = DateTime.UtcNow;
+
+        await db.SaveChangesAsync(ct);
+
+        var participantUserIds = await db.EventParticipants
+            .Where(p => p.EventId == eventId && p.UserId != null)
+            .Select(p => p.UserId!.Value)
+            .ToListAsync(ct);
+
+        foreach (var participantUserId in participantUserIds)
+        {
+            await notificationSender.SendAsync(
+                participantUserId,
+                NotificationType.ResultPosted,
+                $"RESULT_POSTED:{eventId}:{participantUserId}:{result.RecordedAt.Ticks}",
+                "Результат события опубликован.",
+                new Dictionary<string, object> { ["eventId"] = eventId.ToString() },
+                ct);
+        }
+
+        return (true, null);
     }
 
     public async Task<List<EventDto>> GetListAsync(Guid? sportId, Guid? cityId, bool upcoming, string locale, Guid? viewerId, CancellationToken ct)
@@ -461,7 +692,8 @@ public sealed class EventService(
         e.StartsAt, e.EndsAt, e.Timezone,
         e.MaxParticipants, e.ConfirmedCount, e.Cost, e.Currency);
 
-    private static EventDetailDto MapDetail(Event e, string locale) => new(
+    private static EventDetailDto MapDetail(
+        Event e, string locale, string? mvpDisplayName, List<MvpTallyEntryDto> mvpTally, Guid? myVote) => new(
         e.Id, e.PublicId, e.Type, e.Status, e.Visibility,
         new SportDto(e.Sport.Id, e.Sport.Slug, e.Sport.NameI18n, e.Sport.Emoji, e.Sport.HasPositions, e.Sport.IsTeamSport),
         e.ClubId,
@@ -480,6 +712,12 @@ public sealed class EventService(
             p.Id, p.UserId,
             p.UserId is not null ? Localized.Resolve(p.User!.DisplayNameI18n, locale) ?? "" : p.GuestName ?? "",
             p.GuestName, p.Status, p.WaitlistOrder, p.JoinedAt)).ToList(),
+        e.Teams.OrderBy(t => t.SortOrder).Select(t => new EventTeamDto(
+            t.Id, t.Name, t.ColorHex, t.Score, t.SortOrder,
+            e.Participants.Where(p => p.TeamId == t.Id).Select(p => p.Id).ToList())).ToList(),
+        e.Result is null ? null : new EventResultDto(e.Result.Summary, e.Result.Standings, e.Result.MvpUserId, mvpDisplayName, e.Result.RecordedById, e.Result.RecordedAt),
+        mvpTally,
+        myVote,
         LocalizedTextDto.FromNullable(e.TitleI18n),
         LocalizedTextDto.FromNullable(e.DescriptionI18n));
 

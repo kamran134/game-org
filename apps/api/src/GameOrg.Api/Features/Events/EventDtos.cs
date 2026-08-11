@@ -69,6 +69,11 @@ public sealed record EventDetailDto(
     DateTime? CancelledAt,
     string? CancelReason,
     List<EventParticipantDto> Participants,
+    List<EventTeamDto> Teams,
+    // Результаты (Шаг 14) — заполняется после EventStatus.Completed.
+    EventResultDto? Result,
+    List<MvpTallyEntryDto> MvpTally,
+    Guid? MyMvpVote,
     // Резолвнутые Title/Description выше — для страницы просмотра. Эти два —
     // сырые словари по всем языкам, только для формы редактирования.
     LocalizedTextDto? TitleI18n,

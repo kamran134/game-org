@@ -166,6 +166,89 @@ public static class EventsEndpoints
         .Produces(StatusCodes.Status403Forbidden)
         .Produces(StatusCodes.Status404NotFound);
 
+        app.MapPost("/api/events/{id:guid}/complete", async (Guid id, ClaimsPrincipal principal, EventService eventService, CancellationToken ct) =>
+        {
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            var (ok, error) = await eventService.CompleteAsync(id, userId.Value, IsModeratorOrAdmin(principal), ct);
+            if (!ok)
+            {
+                var status = error == "Событие не найдено." ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest;
+                return Results.Problem(error, statusCode: status);
+            }
+
+            return Results.NoContent();
+        })
+        .WithName("CompleteEvent")
+        .WithTags("Events")
+        .RequireAuthorization()
+        .Produces(StatusCodes.Status400BadRequest)
+        .Produces(StatusCodes.Status404NotFound);
+
+        app.MapPut("/api/events/{id:guid}/teams", async (
+            Guid id, SetTeamsRequest request, ClaimsPrincipal principal, EventService eventService, CancellationToken ct) =>
+        {
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            var (ok, error) = await eventService.SetTeamsAsync(id, userId.Value, IsModeratorOrAdmin(principal), request, ct);
+            if (!ok)
+            {
+                var status = error == "Событие не найдено." ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest;
+                return Results.Problem(error, statusCode: status);
+            }
+
+            return Results.NoContent();
+        })
+        .WithName("SetEventTeams")
+        .WithTags("Events")
+        .RequireAuthorization()
+        .Produces(StatusCodes.Status400BadRequest)
+        .Produces(StatusCodes.Status404NotFound);
+
+        app.MapPost("/api/events/{id:guid}/mvp-vote", async (
+            Guid id, MvpVoteRequest request, ClaimsPrincipal principal, EventService eventService, CancellationToken ct) =>
+        {
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            var (ok, error) = await eventService.VoteMvpAsync(id, userId.Value, request.TargetUserId, ct);
+            if (!ok)
+            {
+                var status = error == "Событие не найдено." ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest;
+                return Results.Problem(error, statusCode: status);
+            }
+
+            return Results.NoContent();
+        })
+        .WithName("VoteMvp")
+        .WithTags("Events")
+        .RequireAuthorization()
+        .Produces(StatusCodes.Status400BadRequest)
+        .Produces(StatusCodes.Status404NotFound);
+
+        app.MapPost("/api/events/{id:guid}/result", async (
+            Guid id, RecordResultRequest request, ClaimsPrincipal principal, EventService eventService, CancellationToken ct) =>
+        {
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            var (ok, error) = await eventService.RecordResultAsync(id, userId.Value, IsModeratorOrAdmin(principal), request, ct);
+            if (!ok)
+            {
+                var status = error == "Событие не найдено." ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest;
+                return Results.Problem(error, statusCode: status);
+            }
+
+            return Results.NoContent();
+        })
+        .WithName("RecordEventResult")
+        .WithTags("Events")
+        .RequireAuthorization()
+        .Produces(StatusCodes.Status400BadRequest)
+        .Produces(StatusCodes.Status404NotFound);
+
         app.MapPost("/api/events/{id:guid}/guests", async (
             Guid id,
             AddGuestRequest request,
