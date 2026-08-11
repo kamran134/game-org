@@ -54,6 +54,9 @@ public enum NotificationType
     EventReminder24h, EventReminder2h, EventCreated, EventUpdated, EventCancelled, EventConfirmed,
     ParticipantJoined, ParticipantLeft, WaitlistPromoted, PaymentDue, PaymentConfirmed,
     ClubInvite, ClubJoinRequest, NewFollower, MvpVoteOpen, ResultPosted,
+    // Не было зарезервировано в Шаге 2 — добавлено в Шаге 16. Хранится строкой
+    // в БД (HasConversion<string>()), добавление значения не ломает существующие данные.
+    AchievementEarned,
 }
 
 public enum DeliveryStatus { Queued, Sent, Failed, Skipped }

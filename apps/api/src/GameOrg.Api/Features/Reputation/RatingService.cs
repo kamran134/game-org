@@ -12,7 +12,7 @@ namespace GameOrg.Api.Features.Reputation;
 /// Зовётся ровно один раз на событие — из EventService.RecordResultAsync, только пока
 /// EventResult.RatingsApplied == false (см. docs/PLAN.md, Шаг 15).
 /// </summary>
-public sealed class RatingService(GameOrgDbContext db)
+public sealed class RatingService(GameOrgDbContext db, AchievementService achievementService)
 {
     public async Task ApplyResultAsync(Guid eventId, List<StandingEntry>? standings, CancellationToken ct)
     {
@@ -87,6 +87,11 @@ public sealed class RatingService(GameOrgDbContext db)
         result.RatingsApplied = true;
 
         await db.SaveChangesAsync(ct);
+
+        // После флаша — AchievementService сам делает свежие запросы к SportRating/
+        // ReliabilityStat/EventResult, до SaveChangesAsync они бы читались из БД ещё старыми.
+        foreach (var participant in allUserParticipants)
+            await achievementService.CheckAndAwardAsync(participant.UserId!.Value, eventId, ct);
     }
 
     private async Task ApplyRatingsAsync(Guid sportId, Dictionary<Guid, List<(Guid Opponent, double Score)>> pairwiseGames, CancellationToken ct)

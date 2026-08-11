@@ -1,5 +1,6 @@
 using GameOrg.Api.Common;
 using GameOrg.Api.Features.Geography;
+using GameOrg.Api.Features.Reputation;
 using GameOrg.Domain;
 
 namespace GameOrg.Api.Features.Profiles;
@@ -45,6 +46,7 @@ public sealed record MeProfileDto(
     int FollowersCount,
     int FollowingCount,
     int ReliabilityScore,
+    List<AchievementDto> Achievements,
     // Резолвнутые DisplayName/Bio выше — для отображения. Эти два — сырые
     // словари по всем языкам, нужны только форме редактирования (/me).
     LocalizedTextDto DisplayNameI18n,
@@ -83,7 +85,8 @@ public sealed record PublicProfileDto(
     List<PublicUserSportDto> Sports,
     int FollowersCount,
     bool ViewerIsFollowing,
-    int ReliabilityScore);
+    int ReliabilityScore,
+    List<AchievementDto> Achievements);
 
 /// <summary>
 /// Поле есть в теле и не null → применяется. Поле отсутствует/null → не

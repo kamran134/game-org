@@ -15,7 +15,8 @@ namespace GameOrg.Api.Features.Social;
 public sealed class ActivityService(GameOrgDbContext db, FollowService followService)
 {
     public async Task EmitAsync(
-        Guid actorId, ActivityVerb verb, Guid? eventId, Guid? clubId, Guid? venueId, Guid? targetUserId, CancellationToken ct)
+        Guid actorId, ActivityVerb verb, Guid? eventId, Guid? clubId, Guid? venueId, Guid? targetUserId, CancellationToken ct,
+        Dictionary<string, object>? payload = null)
     {
         db.Activities.Add(new Activity
         {
@@ -26,6 +27,7 @@ public sealed class ActivityService(GameOrgDbContext db, FollowService followSer
             VenueId = venueId,
             TargetUserId = targetUserId,
             Audience = Visibility.Public,
+            Payload = payload,
         });
         await db.SaveChangesAsync(ct);
     }

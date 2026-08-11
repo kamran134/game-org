@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using GameOrg.Api.Common;
 using GameOrg.Api.Features.Geography;
+using GameOrg.Api.Features.Reputation;
 using GameOrg.Api.Features.Social;
 using GameOrg.Domain;
 using GameOrg.Domain.Entities;
@@ -14,7 +15,8 @@ public static class ProfileEndpoints
 {
     public static IEndpointRouteBuilder MapProfileEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/me", async (ClaimsPrincipal principal, HttpContext ctx, GameOrgDbContext db, FollowService followService, CancellationToken ct) =>
+        app.MapGet("/api/me", async (
+            ClaimsPrincipal principal, HttpContext ctx, GameOrgDbContext db, FollowService followService, AchievementService achievementService, CancellationToken ct) =>
         {
             var user = await LoadFullUserAsync(db, principal, ct);
             if (user is null) return Results.Unauthorized();
@@ -23,7 +25,8 @@ public static class ProfileEndpoints
             var followersCount = await followService.CountFollowersAsync(FollowTargetType.User, user.Id, ct);
             var followingCount = await followService.CountFollowingAsync(user.Id, ct);
             var (ratings, reliabilityScore) = await GetReputationAsync(db, user.Id, ct);
-            return Results.Ok(MapMe(user, locale, followersCount, followingCount, reliabilityScore, ratings));
+            var achievements = await GetEarnedAchievementsAsync(achievementService, user.Id, locale, ct);
+            return Results.Ok(MapMe(user, locale, followersCount, followingCount, reliabilityScore, ratings, achievements));
         })
         .WithName("Me")
         .WithTags("Profiles")
@@ -38,6 +41,7 @@ public static class ProfileEndpoints
             GameOrgDbContext db,
             ProfileService profileService,
             FollowService followService,
+            AchievementService achievementService,
             CancellationToken ct) =>
         {
             var user = await LoadFullUserAsync(db, principal, ct);
@@ -54,7 +58,8 @@ public static class ProfileEndpoints
             var followersCount = await followService.CountFollowersAsync(FollowTargetType.User, user.Id, ct);
             var followingCount = await followService.CountFollowingAsync(user.Id, ct);
             var (ratings, reliabilityScore) = await GetReputationAsync(db, user.Id, ct);
-            return Results.Ok(MapMe(user, locale, followersCount, followingCount, reliabilityScore, ratings));
+            var achievements = await GetEarnedAchievementsAsync(achievementService, user.Id, locale, ct);
+            return Results.Ok(MapMe(user, locale, followersCount, followingCount, reliabilityScore, ratings, achievements));
         })
         .WithName("UpdateMe")
         .WithTags("Profiles")
@@ -104,7 +109,7 @@ public static class ProfileEndpoints
         .Produces(StatusCodes.Status404NotFound);
 
         app.MapGet("/api/users/{handle}", async (
-            string handle, HttpContext ctx, ClaimsPrincipal principal, GameOrgDbContext db, FollowService followService, CancellationToken ct) =>
+            string handle, HttpContext ctx, ClaimsPrincipal principal, GameOrgDbContext db, FollowService followService, AchievementService achievementService, CancellationToken ct) =>
         {
             var normalized = handle.TrimStart('@').ToLowerInvariant();
 
@@ -121,7 +126,8 @@ public static class ProfileEndpoints
             var followersCount = await followService.CountFollowersAsync(FollowTargetType.User, user.Id, ct);
             var viewerIsFollowing = await followService.IsFollowingAsync(GetUserId(principal), FollowTargetType.User, user.Id, ct);
             var (ratings, reliabilityScore) = await GetReputationAsync(db, user.Id, ct);
-            return Results.Ok(MapPublic(user, locale, followersCount, viewerIsFollowing, reliabilityScore, ratings));
+            var achievements = await GetEarnedAchievementsAsync(achievementService, user.Id, locale, ct);
+            return Results.Ok(MapPublic(user, locale, followersCount, viewerIsFollowing, reliabilityScore, ratings, achievements));
         })
         .WithName("GetPublicProfile")
         .WithTags("Profiles")
@@ -157,7 +163,14 @@ public static class ProfileEndpoints
         return (ratings, score);
     }
 
-    private static MeProfileDto MapMe(User user, string locale, int followersCount, int followingCount, int reliabilityScore, Dictionary<Guid, SportRating> ratings) => new(
+    private static async Task<List<AchievementDto>> GetEarnedAchievementsAsync(AchievementService achievementService, Guid userId, string locale, CancellationToken ct)
+    {
+        var catalog = await achievementService.GetMyAchievementsAsync(userId, locale, ct);
+        return catalog.Where(a => a.EarnedAt is not null).ToList();
+    }
+
+    private static MeProfileDto MapMe(
+        User user, string locale, int followersCount, int followingCount, int reliabilityScore, Dictionary<Guid, SportRating> ratings, List<AchievementDto> achievements) => new(
         user.Id, user.Handle,
         Localized.Resolve(user.DisplayNameI18n, locale) ?? "",
         Localized.Resolve(user.BioI18n, locale),
@@ -165,18 +178,19 @@ public static class ProfileEndpoints
         user.Locale, user.Timezone, user.ProfileVisibility, MapCity(user.City), user.AvatarId, user.IsVerified,
         user.Role,
         user.Sports.Select(s => MapUserSport(s, ratings)).ToList(),
-        followersCount, followingCount, reliabilityScore,
+        followersCount, followingCount, reliabilityScore, achievements,
         LocalizedTextDto.From(user.DisplayNameI18n),
         LocalizedTextDto.FromNullable(user.BioI18n));
 
-    private static PublicProfileDto MapPublic(User user, string locale, int followersCount, bool viewerIsFollowing, int reliabilityScore, Dictionary<Guid, SportRating> ratings) => new(
+    private static PublicProfileDto MapPublic(
+        User user, string locale, int followersCount, bool viewerIsFollowing, int reliabilityScore, Dictionary<Guid, SportRating> ratings, List<AchievementDto> achievements) => new(
         user.Id,
         user.Handle,
         Localized.Resolve(user.DisplayNameI18n, locale) ?? "",
         Localized.Resolve(user.BioI18n, locale),
         MapCity(user.City), user.AvatarId, user.IsVerified,
         user.Sports.Where(s => s.Visibility == Visibility.Public).Select(s => MapPublicUserSport(s, ratings)).ToList(),
-        followersCount, viewerIsFollowing, reliabilityScore);
+        followersCount, viewerIsFollowing, reliabilityScore, achievements);
 
     private static CityDto? MapCity(City? city) => city is null ? null : new CityDto(city.Id, city.Slug, city.NameI18n, city.Lat, city.Lng);
 
