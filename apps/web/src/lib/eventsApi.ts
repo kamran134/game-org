@@ -4,6 +4,7 @@
 
 import type { LocalizedText } from "@/lib/localized";
 import { fetchWithRefresh } from "@/lib/fetchWithRefresh";
+import type { PaymentSummary } from "@/lib/paymentsApi";
 
 export type EventType = "Game" | "Training" | "Tournament" | "Friendly";
 export type EventStatus = "Draft" | "Scheduled" | "Confirmed" | "Cancelled" | "Completed";
@@ -113,6 +114,7 @@ export type EventDetail = {
   result?: EventResult | null;
   mvpTally: MvpTallyEntry[];
   myMvpVote?: string | null;
+  myPayment?: PaymentSummary | null;
   // Резолвнутые title/description выше — для страницы просмотра. Эти два —
   // сырые словари по всем языкам, только для формы редактирования.
   titleI18n?: LocalizedText | null;
@@ -203,6 +205,21 @@ export async function getEvent(apiUrl: string, locale: string, publicId: string)
   });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Не удалось загрузить событие (${res.status})`);
+  return res.json();
+}
+
+// Кредитная версия — тот же GET, но с cookie. Анонимный getEvent (страница
+// собирается на сервере без cookie) всегда отдаёт myMvpVote/myPayment
+// пустыми — MyPaymentBanner дозапрашивает их на клиенте, чтобы не мигать
+// неправильной суммой при первой отрисовке (в отличие от MVP-голоса, тут
+// ошибиться в первом рендере — показать "не должен" вместо "должен" — цена
+// выше, чем терпимый флик).
+export async function getEventAuthed(apiUrl: string, locale: string, publicId: string): Promise<EventDetail | null> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/events/${encodeURIComponent(publicId)}`, {
+    credentials: "include",
+    headers: localeHeaders(locale),
+  });
+  if (!res.ok) return null;
   return res.json();
 }
 

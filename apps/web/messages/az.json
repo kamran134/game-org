@@ -78,6 +78,7 @@
     "pageTitle": "Mənim profilim",
     "editProfile": "Profili redaktə et",
     "notificationSettings": "Bildiriş ayarları",
+    "myPayments": "Mənim ödənişlərim",
     "loading": "Yüklənir…",
     "fields": {
       "name": "Ad",
@@ -533,6 +534,33 @@
       "addedSport": "profilinə yeni idman növü əlavə etdi",
       "other": "yeni fəaliyyət",
       "untitledEvent": "tədbir"
+    }
+  },
+  "Payments": {
+    "heading": "Ödənişlər",
+    "loading": "Yüklənir…",
+    "loadError": "Ödənişlər yüklənmədi",
+    "saveError": "Yadda saxlanmadı",
+    "saving": "Yadda saxlanılır…",
+    "save": "Yadda saxla",
+    "none": "Hələ ödəniş yoxdur.",
+    "notePlaceholder": "Qeyd",
+    "youOwe": "Ödəniş: {amount} {currency}",
+    "backToProfile": "Mənim profilim",
+    "myPaymentsHeading": "Mənim ödənişlərim",
+    "noPayments": "Hələ ödəniş yoxdur.",
+    "untitledEvent": "Tədbir",
+    "statusOptions": {
+      "Pending": "Ödəniş gözlənilir",
+      "Paid": "Ödənilib",
+      "Failed": "Uğursuz oldu",
+      "Refunded": "Geri qaytarılıb",
+      "Cancelled": "Ləğv edilib"
+    },
+    "methodOptions": {
+      "Cash": "Nağd",
+      "BankTransfer": "Bank köçürməsi",
+      "Balance": "Balans"
     }
   }
 }

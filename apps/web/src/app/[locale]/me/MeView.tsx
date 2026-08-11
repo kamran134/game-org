@@ -82,12 +82,14 @@ export function MeView({ apiUrl }: { apiUrl: string }) {
           </div>
         </dl>
 
-        <Link
-          href="/me/notifications"
-          className="mt-4 inline-block text-sm font-medium text-brand-primary hover:underline"
-        >
-          {t("notificationSettings")}
-        </Link>
+        <div className="mt-4 flex flex-wrap gap-4">
+          <Link href="/me/notifications" className="text-sm font-medium text-brand-primary hover:underline">
+            {t("notificationSettings")}
+          </Link>
+          <Link href="/me/payments" className="text-sm font-medium text-brand-primary hover:underline">
+            {t("myPayments")}
+          </Link>
+        </div>
       </div>
 
       {isModerator && (

@@ -78,6 +78,7 @@
     "pageTitle": "Мой профиль",
     "editProfile": "Редактировать профиль",
     "notificationSettings": "Настройки уведомлений",
+    "myPayments": "Мои платежи",
     "loading": "Загрузка…",
     "fields": {
       "name": "Имя",
@@ -533,6 +534,33 @@
       "addedSport": "добавил(а) новый вид спорта в профиль",
       "other": "новое событие",
       "untitledEvent": "событие"
+    }
+  },
+  "Payments": {
+    "heading": "Платежи",
+    "loading": "Загрузка…",
+    "loadError": "Не удалось загрузить платежи",
+    "saveError": "Не удалось сохранить",
+    "saving": "Сохраняю…",
+    "save": "Сохранить",
+    "none": "Пока нет платежей.",
+    "notePlaceholder": "Заметка",
+    "youOwe": "К оплате: {amount} {currency}",
+    "backToProfile": "Мой профиль",
+    "myPaymentsHeading": "Мои платежи",
+    "noPayments": "Платежей пока нет.",
+    "untitledEvent": "Событие",
+    "statusOptions": {
+      "Pending": "Ожидает оплаты",
+      "Paid": "Оплачено",
+      "Failed": "Не прошло",
+      "Refunded": "Возврат",
+      "Cancelled": "Отменено"
+    },
+    "methodOptions": {
+      "Cash": "Наличные",
+      "BankTransfer": "Банковский перевод",
+      "Balance": "Баланс"
     }
   }
 }

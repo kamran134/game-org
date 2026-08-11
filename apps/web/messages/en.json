@@ -78,6 +78,7 @@
     "pageTitle": "My profile",
     "editProfile": "Edit profile",
     "notificationSettings": "Notification settings",
+    "myPayments": "My payments",
     "loading": "Loading…",
     "fields": {
       "name": "Name",
@@ -533,6 +534,33 @@
       "addedSport": "added a new sport to their profile",
       "other": "new activity",
       "untitledEvent": "an event"
+    }
+  },
+  "Payments": {
+    "heading": "Payments",
+    "loading": "Loading…",
+    "loadError": "Failed to load payments",
+    "saveError": "Failed to save",
+    "saving": "Saving…",
+    "save": "Save",
+    "none": "No payments yet.",
+    "notePlaceholder": "Note",
+    "youOwe": "You owe: {amount} {currency}",
+    "backToProfile": "My profile",
+    "myPaymentsHeading": "My payments",
+    "noPayments": "No payments yet.",
+    "untitledEvent": "Event",
+    "statusOptions": {
+      "Pending": "Pending",
+      "Paid": "Paid",
+      "Failed": "Failed",
+      "Refunded": "Refunded",
+      "Cancelled": "Cancelled"
+    },
+    "methodOptions": {
+      "Cash": "Cash",
+      "BankTransfer": "Bank transfer",
+      "Balance": "Balance"
     }
   }
 }

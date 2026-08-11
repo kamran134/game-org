@@ -9,6 +9,8 @@ import { EventActions } from "./EventActions";
 import { TeamsSection } from "./TeamsSection";
 import { MvpVoteSection } from "./MvpVoteSection";
 import { RecordResultSection } from "./RecordResultSection";
+import { MyPaymentBanner } from "./MyPaymentBanner";
+import { PaymentsSection } from "./PaymentsSection";
 import { ReportButton } from "@/components/ReportButton";
 
 export const dynamic = "force-dynamic";
@@ -113,6 +115,12 @@ export default async function EventPage({ params }: { params: Promise<{ locale: 
             </p>
           )}
 
+          {event.costSplit !== "Free" && (
+            <div className="mt-4">
+              <MyPaymentBanner apiUrl={apiUrl} publicId={event.publicId} />
+            </div>
+          )}
+
           {event.result && (
             <div className="mt-4 rounded-xl border border-brand-border bg-brand-muted/40 p-4">
               <p className="text-sm font-medium text-foreground">{t("result.heading")}</p>
@@ -137,6 +145,7 @@ export default async function EventPage({ params }: { params: Promise<{ locale: 
         <TeamsSection apiUrl={apiUrl} locale={locale} event={event} />
         <MvpVoteSection apiUrl={apiUrl} event={event} />
         <RecordResultSection apiUrl={apiUrl} locale={locale} event={event} />
+        <PaymentsSection apiUrl={apiUrl} event={event} />
       </div>
     </main>
   );
