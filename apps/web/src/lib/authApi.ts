@@ -1,5 +1,6 @@
 import type { LocalizedText } from "@/lib/localized";
 import { fetchWithRefresh } from "@/lib/fetchWithRefresh";
+import type { Achievement } from "@/lib/reputationApi";
 
 export type AuthUser = { userId: string; handle: string; displayName: string };
 
@@ -49,6 +50,7 @@ export type MeProfile = {
   followersCount: number;
   followingCount: number;
   reliabilityScore: number;
+  achievements: Achievement[];
   // Резолвнутые displayName/bio выше — для отображения. Эти два — сырые
   // словари по всем языкам, только для формы редактирования (/me).
   displayNameI18n: LocalizedText;

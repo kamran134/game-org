@@ -1,5 +1,7 @@
 // Как и остальные *Api.ts в проекте — Kiota здесь не используется, всё через fetch.
 
+import { fetchWithRefresh } from "@/lib/fetchWithRefresh";
+
 export type LeaderboardEntry = {
   userId: string;
   handle: string;
@@ -9,6 +11,17 @@ export type LeaderboardEntry = {
   wins: number;
   draws: number;
   losses: number;
+};
+
+// EarnedAt: null — ещё не получено (только в каталоге /api/me/achievements,
+// в профиле — всегда заполнено, там только полученные).
+export type Achievement = {
+  code: string;
+  name: string;
+  description?: string | null;
+  icon?: string | null;
+  tier: number;
+  earnedAt?: string | null;
 };
 
 function apiBase(apiUrl: string): string {
@@ -25,5 +38,14 @@ export async function getLeaderboard(apiUrl: string, locale: string, sportSlug: 
     headers: localeHeaders(locale),
   });
   if (!res.ok) throw new Error(`Не удалось загрузить рейтинг (${res.status})`);
+  return res.json();
+}
+
+export async function getMyAchievements(apiUrl: string, locale: string): Promise<Achievement[]> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/me/achievements`, {
+    credentials: "include",
+    headers: localeHeaders(locale),
+  });
+  if (!res.ok) throw new Error(`Не удалось загрузить достижения (${res.status})`);
   return res.json();
 }

@@ -133,6 +133,32 @@ export function MeView({ apiUrl }: { apiUrl: string }) {
           </ul>
         )}
       </div>
+
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-heading text-lg font-semibold text-foreground">{t("achievementsHeading")}</h2>
+          <Link href="/me/achievements" className="text-sm font-medium text-brand-primary hover:underline">
+            {t("viewAllAchievements")}
+          </Link>
+        </div>
+
+        {profile.achievements.length === 0 ? (
+          <p className="text-sm text-foreground/60">{t("noAchievements")}</p>
+        ) : (
+          <ul className="flex flex-wrap gap-3">
+            {profile.achievements.map((a) => (
+              <li
+                key={a.code}
+                title={a.description ?? undefined}
+                className="flex items-center gap-2 rounded-2xl border border-brand-border bg-background px-4 py-2"
+              >
+                <span className="text-lg">{a.icon}</span>
+                <span className="text-sm font-medium text-foreground">{a.name}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

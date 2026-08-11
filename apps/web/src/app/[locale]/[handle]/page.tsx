@@ -78,6 +78,9 @@ export default async function PublicProfilePage({
   const profileId = profile.additionalData?.id as string | undefined;
   const followersCount = profile.additionalData?.followersCount as number | undefined;
   const reliabilityScore = profile.additionalData?.reliabilityScore as number | undefined;
+  const achievements = (profile.additionalData?.achievements ?? []) as
+    | { code: string; name: string; description?: string; icon?: string }[]
+    | undefined;
 
   return (
     <main className="flex-1 bg-brand-background px-6 py-16">
@@ -145,6 +148,21 @@ export default async function PublicProfilePage({
                 </li>
               );
             })}
+          </ul>
+        )}
+
+        {achievements && achievements.length > 0 && (
+          <ul className="mt-6 flex flex-wrap gap-3">
+            {achievements.map((a) => (
+              <li
+                key={a.code}
+                title={a.description}
+                className="flex items-center gap-2 rounded-2xl border border-brand-border bg-background px-4 py-2"
+              >
+                <span className="text-lg">{a.icon}</span>
+                <span className="text-sm font-medium text-foreground">{a.name}</span>
+              </li>
+            ))}
           </ul>
         )}
       </div>
