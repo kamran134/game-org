@@ -1221,6 +1221,124 @@ Payments — деньги решили отложить до выбора про
 - В браузере не проверялось (см. выше) — честно, не выдаю сборку за
   визуальную проверку.
 
+### Шаг 14 — Результаты игр: команды, результат, MVP
+
+Домен готов с Шага 2 (`EventTeam`, `EventResult`, `MvpVote`,
+`EventParticipant.TeamId`, `mvp_no_self` в `001_constraints.sql`), кода нет
+вообще — явно вынесено «вне охвата» в Шаге 8 (§8, "Явно вне охвата Шага 8").
+Взято по выбору пользователя из оставшихся кусков генплана.
+
+**Решения по умолчанию (не вопрос пользователю):**
+
+- Живёт в `Features/Events/` — это под-ресурсы события, не отдельный модуль
+  (`EventTeamDto`/`EventResultDto`/`MvpVote*` — в `EventDtos.cs`/новом
+  `EventResultDtos.cs`, методы — в существующем `EventService`).
+- **`SportRating` (Glicko-2) — сюда не входит.** `EventResult.RatingsApplied`
+  остаётся `false` всегда — пересчёт рейтинга по результату будет отдельным
+  шагом («Рейтинг и надёжность»), который явно требует уже записанных
+  `EventResult`, поэтому логичен только после этого шага. Здесь только
+  фиксация факта: кто с кем в команде, какой счёт, кто MVP — задел под
+  будущий пересчёт, не сам пересчёт.
+- **Завершение события** — новое действие `CompleteAsync`: создатель или
+  модератор, только из `Scheduled`/`Confirmed`, только после `EndsAt`
+  (иначе понятная ошибка вместо "результата ещё нет"). Открывает MVP-
+  голосование и разрешает запись результата — до этого момента ни то, ни
+  другое недоступно.
+- **MVP — голосование, а не только ручной выбор.** Участники (только те, у
+  кого `UserId` — не гости) голосуют друг за друга после `Completed` (не
+  за себя — `mvp_no_self` в БД, дублируем проверку с понятным сообщением).
+  Голос уникален на пару (EventId, VoterId) — повторное голосование меняет
+  цель, не плодит вторую запись. `RecordResultAsync` фиксирует
+  `EventResult.MvpUserId` как победителя голосования на момент записи,
+  если организатор явно не передал `MvpUserId` — переопределение вручную
+  всегда в приоритете (свежее авторское решение важнее голосов).
+- **Явка** (`ParticipationStatus.Attended`/`NoShow`/`LateCancel` — есть в
+  enum'е с Шага 8, нигде не выставлялись) проставляется тут же, при записи
+  результата — естественный момент, когда организатор и так подводит
+  итоги. Без этого шага эти три статуса участника были бы мёртвым кодом.
+- Команды и результат читаются вместе с событием — расширение
+  `EventDetailDto` (`Teams`/`Result`/`MvpTally`/`MyMvpVote`), не отдельные
+  GET-эндпоинты — та же логика видимости (`Public`/`Club`-геттинг), что уже
+  есть у `GetByPublicIdAsync`, не нужно дублировать.
+- `NotificationType.MvpVoteOpen`/`ResultPosted` — **первые реальные
+  вызовы** этих двух типов (до сих пор числились в enum'е под ещё не
+  построенный кусок, см. `NotificationService.WiredTypes`). `ActivityVerb
+  .CompletedEvent` — тот же самый gate по `Visibility == Public`, что уже
+  есть у `CreatedEvent`/`JoinedEvent` (Шаг 13).
+
+#### Фаза 14.1 — Backend: завершение события, команды
+
+- `EventService.CompleteAsync(eventId, userId, isModerator, ct)` —
+  проверки выше, эмитит `ActivityVerb.CompletedEvent` (если `Visibility
+  == Public`), шлёт `NotificationType.MvpVoteOpen` всем `Confirmed`/
+  `Attended`-участникам с `UserId`.
+- `EventService.SetTeamsAsync(eventId, userId, isModerator, request, ct)`
+  — создатель/модератор; полная замена состава команд (как
+  `club.Sports.Clear()+Add` в `ClubService`) — удаляет старые
+  `EventTeam`, обнуляет `EventParticipant.TeamId` через `ExecuteUpdateAsync`,
+  создаёт новые команды, расставляет `TeamId` по присланным спискам
+  участников; 400 с понятным текстом, если участник не из этого события
+  или встречается в двух командах.
+- `Features/Events/EventResultDtos.cs`: `EventTeamDto`, `TeamInput`,
+  `SetTeamsRequest`.
+- `EventDetailDto` — добавить `Teams: List<EventTeamDto>`.
+- `EventsEndpoints.cs`: `POST /api/events/{id:guid}/complete`, `PUT
+  /api/events/{id:guid}/teams` — оба `.RequireAuthorization()`.
+
+#### Фаза 14.2 — Backend: результат и MVP-голосование
+
+- `EventResultDtos.cs`: `StandingEntry`, `TeamScoreEntry`,
+  `AttendanceEntry`, `RecordResultRequest`, `EventResultDto`,
+  `MvpVoteRequest`, `MvpTallyEntryDto`.
+- `EventService.VoteMvpAsync(eventId, voterId, targetUserId, ct)` —
+  только участник события голосует за другого участника события, только
+  после `Completed`; upsert по `(EventId, VoterId)`.
+- `EventService.RecordResultAsync(eventId, userId, isModerator, request, ct)`
+  — создатель/модератор, только для `Completed`; применяет
+  `TeamScores` (`ExecuteUpdateAsync` на `EventTeam.Score`), `Attendance`
+  (только `Attended`/`NoShow`/`LateCancel`, иначе 400), резолвит
+  `MvpUserId` (явный или победитель голосования), upsert `EventResult`
+  (PK — `EventId`, поэтому повторный вызов — редактирование, не 409), шлёт
+  `NotificationType.ResultPosted` всем участникам с `UserId`.
+- `EventDetailDto` — добавить `Result: EventResultDto?`, `MvpTally:
+  List<MvpTallyEntryDto>`, `MyMvpVote: Guid?` (голос текущего viewer'а).
+- `EventsEndpoints.cs`: `POST /api/events/{id:guid}/mvp-vote`, `POST
+  /api/events/{id:guid}/result` — оба `.RequireAuthorization()`.
+
+#### Фаза 14.3 — Frontend: завершение события и команды
+
+- `eventsApi.ts` — расширить типы (`EventTeam`, `EventResult`,
+  `MvpTallyEntry` в `EventDetail`), `completeEvent`, `setEventTeams`.
+- `EventActions.tsx` (или новый `EventCompleteAction.tsx`) — кнопка
+  «Завершить событие» для создателя/модератора, видна после `EndsAt` и
+  только для `Scheduled`/`Confirmed`.
+- `TeamsSection.tsx` (новый, только для создателя/модератора, только пока
+  не `Completed` — после результата состав команд не трогаем) — форма:
+  добавить/убрать команду (название, цвет), распределить участников
+  drag-free (простые `<select>` на участника — без drag&drop, это не
+  входит в объём).
+
+#### Фаза 14.4 — Frontend: MVP-голосование и результат
+
+- `eventsApi.ts` — `voteMvp`, `recordResult`.
+- `MvpVoteSection.tsx` (новый, для участников события после `Completed`,
+  своего голоса не показываем как отдельный вариант) — список участников,
+  кнопка «Голосовать», текущий тэлли.
+- `RecordResultSection.tsx` (новый, для создателя/модератора после
+  `Completed`) — summary, по команде — поле счёта (если есть команды) или
+  по участнику — место/очки (если команд нет), явка (чекбоксы
+  Attended/NoShow/LateCancel), MVP — dropdown с преднабранным победителем
+  голосования, можно переопределить.
+- Отображение результата (все, после записи) — summary, счёт по
+  командам/расстановка, бейдж MVP на участнике.
+- i18n: `Events.teams.*`, `Events.result.*`, `Events.mvp.*`.
+
+#### Фаза 14.5 — Сборка и проверка
+
+- `dotnet build`/`dotnet test`, `pnpm --filter web run build`, `pnpm run lint`.
+- В браузере не проверялось без локального Docker/Postgres — см. тот же
+  честный disclaimer, что в Шаге 13.
+
 ---
 
 ## 9. Конвенции
