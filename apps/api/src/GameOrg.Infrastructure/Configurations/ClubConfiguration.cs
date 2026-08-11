@@ -1,4 +1,5 @@
 using GameOrg.Domain.Entities;
+using GameOrg.Infrastructure.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -12,8 +13,13 @@ public sealed class ClubConfiguration : IEntityTypeConfiguration<Club>
         builder.Property(e => e.Id).ValueGeneratedNever();
         // Уникальность slug среди "живых" — partial unique index в 001_constraints.sql.
         builder.Property(e => e.Slug).HasColumnType("citext");
-        builder.Property(e => e.Name).HasMaxLength(80);
-        builder.Property(e => e.Description).HasMaxLength(1000);
+        // Лимиты длины (80/1000 на каждый язык) — в валидации сервиса (см.
+        // ClubService), не здесь: это jsonb-словарь, а не одна строка.
+        builder.Property(e => e.NameI18n).HasColumnType("jsonb").HasConversion(JsonConversions.For<Dictionary<string, string>>());
+        builder.Property(e => e.DescriptionI18n).HasColumnType("jsonb").HasConversion(JsonConversions.For<Dictionary<string, string>>());
+        // Generated-колонка Postgres (см. миграцию ClubMultilingualContent) —
+        // EF только читает значение обратно после save, никогда не пишет его.
+        builder.Property(e => e.SearchText).HasColumnType("text").ValueGeneratedOnAddOrUpdate();
         builder.Property(e => e.Visibility).HasConversion<string>().HasMaxLength(32);
         builder.Property(e => e.InviteCode).HasMaxLength(16);
 
