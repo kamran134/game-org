@@ -19,6 +19,19 @@ public static class ClubsEndpoints
         .WithTags("Clubs")
         .Produces<List<ClubDto>>();
 
+        app.MapGet("/api/clubs/mine", async (HttpContext ctx, ClaimsPrincipal principal, ClubService clubService, CancellationToken ct) =>
+        {
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            var locale = RequestLocale.Resolve(ctx.Request.Headers.AcceptLanguage.ToString());
+            return Results.Ok(await clubService.GetMyClubsAsync(userId.Value, locale, ct));
+        })
+        .WithName("GetMyClubs")
+        .WithTags("Clubs")
+        .RequireAuthorization()
+        .Produces<List<ClubDto>>();
+
         app.MapGet("/api/clubs/{slug}", async (string slug, HttpContext ctx, ClaimsPrincipal principal, ClubService clubService, CancellationToken ct) =>
         {
             var locale = RequestLocale.ResolveAndVary(ctx);

@@ -10,6 +10,7 @@
   },
   "Nav": {
     "venues": "Venues",
+    "clubs": "Clubs",
     "events": "Events",
     "sports": "Sports",
     "myProfile": "My profile",
@@ -216,6 +217,8 @@
       "sportNotSet": "Choose a sport",
       "venue": "Venue",
       "venueNotSet": "Not from catalog",
+      "club": "Club",
+      "clubNotSet": "Choose a club",
       "customLocation": "Or enter a place as text",
       "title": "Title",
       "description": "Description",
@@ -237,6 +240,7 @@
     },
     "visibilityOptions": {
       "Public": "Public",
+      "Club": "Club only",
       "Unlisted": "Unlisted (link only)"
     },
     "costSplitOptions": {
@@ -348,7 +352,74 @@
       "EventConfirmed": "Event confirmed (minimum participants reached)",
       "ParticipantJoined": "New sign-up for my event",
       "ParticipantLeft": "Someone left my event",
-      "WaitlistPromoted": "Moved from waitlist to participant"
+      "WaitlistPromoted": "Moved from waitlist to participant",
+      "ClubInvite": "Club invite",
+      "ClubJoinRequest": "Club join request"
     }
+  },
+  "Clubs": {
+    "pageTitle": "Clubs",
+    "addClub": "Create club",
+    "empty": "Nothing found yet.",
+    "backToList": "All clubs",
+    "notFound": "Club not found",
+    "noAccessEdit": "Only the club's owner or admin can edit it.",
+    "editClub": "Edit club",
+    "deleteClub": "Delete club",
+    "deleteConfirm": "Delete this club? This cannot be undone.",
+    "manageMembers": "Members",
+    "membersCount": "{count} members",
+    "statusPending": "Request pending",
+    "join": "Join",
+    "requestJoin": "Request to join",
+    "leave": "Leave club",
+    "inviteCode": "Invite code",
+    "copyInviteCode": "Copy code",
+    "actionError": "Failed to perform action",
+    "createError": "Failed to create club",
+    "saveError": "Failed to save changes",
+    "creating": "Creating…",
+    "saving": "Saving…",
+    "create": "Create club",
+    "save": "Save",
+    "fields": {
+      "name": "Name",
+      "description": "Description",
+      "city": "City",
+      "cityNotSet": "Not set",
+      "visibility": "Visibility",
+      "sports": "Sports"
+    },
+    "visibilityOptions": {
+      "Public": "Public",
+      "RequestOnly": "Request to join",
+      "Private": "Private"
+    },
+    "visibilityHints": {
+      "Public": "Any signed-in user can join.",
+      "RequestOnly": "Joining requires a request, approved by the owner or an admin.",
+      "Private": "Joinable only by invite or code — not shown in the public catalog to non-members."
+    },
+    "inviteHeading": "Invite a member",
+    "inviteHandlePlaceholder": "User handle (@handle)",
+    "invite": "Invite",
+    "userNotFound": "User not found",
+    "regenerateCode": "Regenerate code",
+    "joinRequestsHeading": "Join requests",
+    "approve": "Approve",
+    "reject": "Reject",
+    "membersHeading": "Members",
+    "loading": "Loading…",
+    "roleOptions": {
+      "Owner": "Owner",
+      "Admin": "Admin",
+      "Member": "Member"
+    },
+    "demoteToMember": "Remove admin",
+    "promoteToAdmin": "Make admin",
+    "makeOwner": "Transfer ownership",
+    "removeMember": "Remove",
+    "removeMemberConfirm": "Remove this member from the club?",
+    "transferOwnershipConfirm": "Transfer club ownership to this member? You'll become an admin."
   }
 }

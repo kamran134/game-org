@@ -10,6 +10,7 @@
   },
   "Nav": {
     "venues": "Meydançalar",
+    "clubs": "Klublar",
     "events": "Tədbirlər",
     "sports": "İdman növləri",
     "myProfile": "Mənim profilim",
@@ -216,6 +217,8 @@
       "sportNotSet": "İdman növünü seçin",
       "venue": "Meydança",
       "venueNotSet": "Kataloqdan deyil",
+      "club": "Klub",
+      "clubNotSet": "Klub seçin",
       "customLocation": "Və ya yeri mətnlə göstərin",
       "title": "Ad",
       "description": "Təsvir",
@@ -237,6 +240,7 @@
     },
     "visibilityOptions": {
       "Public": "Açıq",
+      "Club": "Yalnız klub üçün",
       "Unlisted": "Gizli (linklə)"
     },
     "costSplitOptions": {
@@ -348,7 +352,74 @@
       "EventConfirmed": "Tədbir təsdiqləndi (minimum iştirakçı toplandı)",
       "ParticipantJoined": "Mənim tədbirimə yeni qeydiyyat",
       "ParticipantLeft": "Mənim tədbirimdən qeydiyyatın ləğvi",
-      "WaitlistPromoted": "Gözləmə siyahısından iştirakçıya keçid"
+      "WaitlistPromoted": "Gözləmə siyahısından iştirakçıya keçid",
+      "ClubInvite": "Kluba dəvət",
+      "ClubJoinRequest": "Kluba qoşulma sorğusu"
     }
+  },
+  "Clubs": {
+    "pageTitle": "Klublar",
+    "addClub": "Klub yarat",
+    "empty": "Hələ heç nə tapılmadı.",
+    "backToList": "Bütün klublar",
+    "notFound": "Klub tapılmadı",
+    "noAccessEdit": "Yalnız klubun sahibi və ya admini redaktə edə bilər.",
+    "editClub": "Klubu redaktə et",
+    "deleteClub": "Klubu sil",
+    "deleteConfirm": "Klubu silmək istəyirsiniz? Bu əməliyyat geri qaytarılmır.",
+    "manageMembers": "İştirakçılar",
+    "membersCount": "{count} iştirakçı",
+    "statusPending": "Sorğu baxılır",
+    "join": "Qoşul",
+    "requestJoin": "Sorğu göndər",
+    "leave": "Klubu tərk et",
+    "inviteCode": "Dəvət kodu",
+    "copyInviteCode": "Kodu kopyala",
+    "actionError": "Əməliyyat yerinə yetirilmədi",
+    "createError": "Klub yaradılmadı",
+    "saveError": "Dəyişikliklər yadda saxlanmadı",
+    "creating": "Yaradılır…",
+    "saving": "Yadda saxlanılır…",
+    "create": "Klub yarat",
+    "save": "Yadda saxla",
+    "fields": {
+      "name": "Ad",
+      "description": "Təsvir",
+      "city": "Şəhər",
+      "cityNotSet": "Göstərilməyib",
+      "visibility": "Görünürlük",
+      "sports": "İdman növləri"
+    },
+    "visibilityOptions": {
+      "Public": "Açıq",
+      "RequestOnly": "Sorğu ilə",
+      "Private": "Qapalı"
+    },
+    "visibilityHints": {
+      "Public": "Hər hansı daxil olmuş istifadəçi qoşula bilər.",
+      "RequestOnly": "Qoşulma sahib və ya admin tərəfindən təsdiqlənən sorğu ilə.",
+      "Private": "Yalnız dəvət və ya kodla qoşulmaq olar — klub üzv olmayanlara ümumi kataloqda görünmür."
+    },
+    "inviteHeading": "İştirakçı dəvət et",
+    "inviteHandlePlaceholder": "İstifadəçi nikneymi (@handle)",
+    "invite": "Dəvət et",
+    "userNotFound": "İstifadəçi tapılmadı",
+    "regenerateCode": "Kodu yenilə",
+    "joinRequestsHeading": "Qoşulma sorğuları",
+    "approve": "Təsdiqlə",
+    "reject": "Rədd et",
+    "membersHeading": "İştirakçılar",
+    "loading": "Yüklənir…",
+    "roleOptions": {
+      "Owner": "Sahib",
+      "Admin": "Admin",
+      "Member": "İştirakçı"
+    },
+    "demoteToMember": "Admin statusunu al",
+    "promoteToAdmin": "Admin et",
+    "makeOwner": "Sahibliyi ver",
+    "removeMember": "Sil",
+    "removeMemberConfirm": "İştirakçını klubdan silmək istəyirsiniz?",
+    "transferOwnershipConfirm": "Klubun sahibliyini bu iştirakçıya vermək istəyirsiniz? Siz admin olacaqsınız."
   }
 }

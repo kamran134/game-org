@@ -10,6 +10,7 @@
   },
   "Nav": {
     "venues": "Площадки",
+    "clubs": "Клубы",
     "events": "События",
     "sports": "Виды спорта",
     "myProfile": "Мой профиль",
@@ -216,6 +217,8 @@
       "sportNotSet": "Выберите вид спорта",
       "venue": "Площадка",
       "venueNotSet": "Не из каталога",
+      "club": "Клуб",
+      "clubNotSet": "Выберите клуб",
       "customLocation": "Или укажите место текстом",
       "title": "Название",
       "description": "Описание",
@@ -237,6 +240,7 @@
     },
     "visibilityOptions": {
       "Public": "Публичное",
+      "Club": "Только для клуба",
       "Unlisted": "Скрытое (по ссылке)"
     },
     "costSplitOptions": {
@@ -348,7 +352,74 @@
       "EventConfirmed": "Событие подтверждено (набрался минимум участников)",
       "ParticipantJoined": "Новая запись на моё событие",
       "ParticipantLeft": "Отмена записи на моё событие",
-      "WaitlistPromoted": "Перевод из листа ожидания в участники"
+      "WaitlistPromoted": "Перевод из листа ожидания в участники",
+      "ClubInvite": "Приглашение в клуб",
+      "ClubJoinRequest": "Заявка на вступление в клуб"
     }
+  },
+  "Clubs": {
+    "pageTitle": "Клубы",
+    "addClub": "Создать клуб",
+    "empty": "Пока ничего не нашлось.",
+    "backToList": "Все клубы",
+    "notFound": "Клуб не найден",
+    "noAccessEdit": "Редактировать может только владелец или админ клуба.",
+    "editClub": "Редактировать клуб",
+    "deleteClub": "Удалить клуб",
+    "deleteConfirm": "Удалить клуб? Это действие нельзя отменить.",
+    "manageMembers": "Участники",
+    "membersCount": "{count} участников",
+    "statusPending": "Заявка на рассмотрении",
+    "join": "Вступить",
+    "requestJoin": "Подать заявку",
+    "leave": "Покинуть клуб",
+    "inviteCode": "Код приглашения",
+    "copyInviteCode": "Скопировать код",
+    "actionError": "Не удалось выполнить действие",
+    "createError": "Не удалось создать клуб",
+    "saveError": "Не удалось сохранить изменения",
+    "creating": "Создаю…",
+    "saving": "Сохраняю…",
+    "create": "Создать клуб",
+    "save": "Сохранить",
+    "fields": {
+      "name": "Название",
+      "description": "Описание",
+      "city": "Город",
+      "cityNotSet": "Не указан",
+      "visibility": "Видимость",
+      "sports": "Виды спорта"
+    },
+    "visibilityOptions": {
+      "Public": "Открытый",
+      "RequestOnly": "По заявке",
+      "Private": "Закрытый"
+    },
+    "visibilityHints": {
+      "Public": "Вступить может любой залогиненный пользователь.",
+      "RequestOnly": "Вступление — по заявке, которую одобряет владелец или админ.",
+      "Private": "Попасть можно только по приглашению или коду — клуб не виден в общем каталоге тем, кто не состоит в нём."
+    },
+    "inviteHeading": "Пригласить участника",
+    "inviteHandlePlaceholder": "Ник пользователя (@handle)",
+    "invite": "Пригласить",
+    "userNotFound": "Пользователь не найден",
+    "regenerateCode": "Обновить код",
+    "joinRequestsHeading": "Заявки на вступление",
+    "approve": "Одобрить",
+    "reject": "Отклонить",
+    "membersHeading": "Участники",
+    "loading": "Загрузка…",
+    "roleOptions": {
+      "Owner": "Владелец",
+      "Admin": "Админ",
+      "Member": "Участник"
+    },
+    "demoteToMember": "Снять админа",
+    "promoteToAdmin": "Сделать админом",
+    "makeOwner": "Передать владение",
+    "removeMember": "Удалить",
+    "removeMemberConfirm": "Удалить участника из клуба?",
+    "transferOwnershipConfirm": "Передать владение клубом этому участнику? Вы станете админом."
   }
 }

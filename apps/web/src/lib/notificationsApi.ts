@@ -11,7 +11,9 @@ export type NotificationType =
   | "EventConfirmed"
   | "ParticipantJoined"
   | "ParticipantLeft"
-  | "WaitlistPromoted";
+  | "WaitlistPromoted"
+  | "ClubInvite"
+  | "ClubJoinRequest";
 
 export type NotificationItem = {
   id: string;

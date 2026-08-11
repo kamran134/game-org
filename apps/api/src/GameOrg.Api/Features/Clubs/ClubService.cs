@@ -127,6 +127,20 @@ public sealed class ClubService(GameOrgDbContext db, NotificationSender notifica
             MapCity(c.City), c.Visibility, c.MembersCount, c.EventsCount)).ToList();
     }
 
+    /// <summary>Клубы, где viewer активный участник — для селектора клуба в форме события (ClubId требует активного членства).</summary>
+    public async Task<List<ClubDto>> GetMyClubsAsync(Guid userId, string locale, CancellationToken ct)
+    {
+        var clubs = await db.ClubMembers
+            .Where(m => m.UserId == userId && m.Status == MembershipStatus.Active)
+            .Select(m => m.Club)
+            .Include(c => c.City)
+            .ToListAsync(ct);
+
+        return clubs.Select(c => new ClubDto(
+            c.Id, c.Slug, Localized.Resolve(c.NameI18n, locale) ?? "",
+            MapCity(c.City), c.Visibility, c.MembersCount, c.EventsCount)).ToList();
+    }
+
     /// <summary>Только Owner. Soft-delete — DeletedAt, глобальный HasQueryFilter уже прячет клуб из всех выдач.</summary>
     public async Task<(bool Ok, string? Error)> DeleteAsync(Guid clubId, Guid userId, CancellationToken ct)
     {

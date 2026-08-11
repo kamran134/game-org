@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { fetchMe, type MeProfile } from "@/lib/authApi";
+import { getMyClubs, type ClubListItem } from "@/lib/clubsApi";
 import {
   createEvent,
   updateEvent,
@@ -19,7 +20,7 @@ import { I18nField } from "@/components/I18nField";
 type Option = { id: string; name: string };
 
 const TYPES: EventType[] = ["Game", "Training", "Tournament", "Friendly"];
-const VISIBILITIES: EventVisibility[] = ["Public", "Unlisted"];
+const ALL_VISIBILITIES: EventVisibility[] = ["Public", "Club", "Unlisted"];
 const COST_SPLITS: CostSplit[] = ["Free", "PerPlayer", "Total"];
 
 const fieldClass =
@@ -55,9 +56,9 @@ export function EventForm({
   const [allowed, setAllowed] = useState(mode === "create");
 
   const [type, setType] = useState<EventType>(event?.type ?? "Game");
-  const [visibility, setVisibility] = useState<EventVisibility>(
-    event?.visibility === "Club" ? "Public" : (event?.visibility ?? "Public"),
-  );
+  const [visibility, setVisibility] = useState<EventVisibility>(event?.visibility ?? "Public");
+  const [clubId, setClubId] = useState(event?.clubId ?? "");
+  const [myClubs, setMyClubs] = useState<ClubListItem[]>([]);
   const [sportId, setSportId] = useState(event?.sport.id ?? sports[0]?.id ?? "");
   const [venueId, setVenueId] = useState(event?.venue?.id ?? "");
   const [customLocation, setCustomLocation] = useState(event?.customLocation ?? "");
@@ -89,6 +90,23 @@ export function EventForm({
       .catch(() => setChecking(false));
   }, [apiUrl, locale, mode, router, event]);
 
+  useEffect(() => {
+    getMyClubs(apiUrl, locale).then(setMyClubs);
+  }, [apiUrl, locale]);
+
+  // ClubId неизменяем после создания (см. UpdateEventRequest на бэкенде) —
+  // видимость "Клуб" доступна только там, где есть из чего выбрать: при
+  // создании — если состоишь хоть в одном клубе, при редактировании — если
+  // клуб уже был привязан.
+  const visibilities: EventVisibility[] =
+    mode === "create"
+      ? myClubs.length > 0
+        ? ALL_VISIBILITIES
+        : ["Public", "Unlisted"]
+      : event?.clubId
+        ? ALL_VISIBILITIES
+        : ["Public", "Unlisted"];
+
   const hasPlace = venueId !== "" || customLocation.trim() !== "";
 
   async function handleSubmit() {
@@ -99,6 +117,7 @@ export function EventForm({
         type,
         visibility,
         sportId,
+        clubId: clubId || null,
         venueId: venueId || null,
         customLocation: customLocation.trim() || null,
         title,
@@ -147,7 +166,7 @@ export function EventForm({
         <label className="flex flex-col gap-1">
           <span className="text-sm font-medium text-foreground">{t("fields.visibility")}</span>
           <select className={fieldClass} value={visibility} onChange={(e) => setVisibility(e.target.value as EventVisibility)}>
-            {VISIBILITIES.map((v) => (
+            {visibilities.map((v) => (
               <option key={v} value={v}>
                 {t(`visibilityOptions.${v}`)}
               </option>
@@ -155,6 +174,20 @@ export function EventForm({
           </select>
         </label>
       </div>
+
+      {visibility === "Club" && (
+        <label className="flex flex-col gap-1">
+          <span className="text-sm font-medium text-foreground">{t("fields.club")}</span>
+          <select className={fieldClass} value={clubId} onChange={(e) => setClubId(e.target.value)} disabled={mode === "edit"}>
+            <option value="">{t("fields.clubNotSet")}</option>
+            {myClubs.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <label className="flex flex-col gap-1">
         <span className="text-sm font-medium text-foreground">{t("fields.sport")}</span>
