@@ -1083,6 +1083,144 @@ enum'а:**
 - Пункт «Клубы» в `SiteHeader`/`MobileNav`.
 - i18n: статусы участников, роли, причины отказа.
 
+### Шаг 13 — Подписки и лента (Social)
+
+Домен готов с Шага 2 (`Follow` — три nullable FK на User/Club/Venue,
+CHECK «ровно одна цель» + «нельзя подписаться на себя» в
+`001_constraints.sql`; `Activity` — `ActivityVerb`, `Audience`, jsonb
+`Payload`, индексы под выборку по автору/аудитории/клубу), кода нет
+вообще. Взято по списку модулей §3 (`Social` — следующий из оставшихся:
+`Payments → Social → Reputation`, но пользователь выбрал Social раньше
+Payments — деньги решили отложить до выбора провайдера).
+
+**Решения по умолчанию (прямые следствия уже принятой схемы, не вопрос
+пользователю):**
+
+- API поверх полиморфного `Follow` — не три отдельных набора эндпоинтов
+  на User/Club/Venue, а один `Features/Social/` с новым API-only enum'ом
+  `FollowTargetType{User,Club,Venue}` (в `Follow`-таблице остаётся как
+  есть — три FK; enum только для формы запроса/ответа).
+- **Лента = fan-out on read** (§10 «Что НЕ делать» это уже требует):
+  `GetFeedAsync(userId)` — объединение (OR) трёх условий: автор входит в
+  число тех, на кого подписан viewer; ИЛИ `ClubId` записи входит в число
+  подписок viewer'а; ИЛИ `VenueId` записи входит в число подписок. Без
+  отдельной feed_entries-таблицы, без фонового job'а.
+- **Приватность записи ленты решается в момент записи, не чтения:**
+  `ActivityService.EmitAsync` пишет строку, только если сущность-повод
+  публично видна (`Club.Visibility != Private`, `Event.Visibility ==
+  Public`, `Venue.Status == Published`, для профильных действий —
+  `ProfileVisibility == Public`) — иначе не пишет вообще. `Audience`
+  всегда остаётся `Public` на уже отфильтрованных записях; вариант
+  `Visibility.Followers` в поле `Audience` не используется — усложнение
+  без проверенного сценария, поле в схеме просто зарезервировано на будущее.
+- **Какие `ActivityVerb` реально подключаются в этом шаге:** `CreatedEvent`,
+  `JoinedEvent` (только при переходе в `Confirmed`, не `Maybe`/`Waitlisted`),
+  `CreatedClub`, `JoinedClub`, `ReviewedVenue`, `AddedSport`. Не
+  подключаются (нет данных/шага под них): `CompletedEvent` (нет флоу
+  завершения игры), `EarnedAchievement`/`RatingMilestone` (Achievement и
+  Reputation — не построенные пока куски генплана) — как `WiredTypes` в
+  `NotificationService` уже разделяет «в enum'е есть» и «реально шлётся».
+- Счётчики (`FollowersCount`/`FollowingCount`, `ViewerIsFollowing`) —
+  только в *Detail-DTO (`PublicProfileDto`/`MeProfileDto`,
+  `ClubDetailDto`, `VenueDetailDto`), не в списках — там это негде
+  показывать сейчас, а лишний count-запрос на каждую карточку списка не
+  нужен.
+
+#### Фаза 13.1 — Backend: подписки (Follow)
+
+- `Domain/Enums.cs`: `FollowTargetType{User,Club,Venue}`.
+- `Features/Social/SocialDtos.cs`: `FollowRequest(FollowTargetType,
+  Guid)`, `FollowSummaryDto(FollowTargetType, Guid Id, string Slug,
+  string Name, Guid? AvatarId)` — общий для «подписчики» (всегда
+  пользователи) и «подписки» (User/Club/Venue вперемешку).
+- `Features/Social/FollowService.cs`: `FollowAsync` (проверка что цель
+  существует и публично видна — на приватный клуб/venue-в-Draft/приватный
+  профиль подписаться нельзя; self-follow → 400; гонка на unique-индексе
+  → трактовать как успех, идемпотентно), `UnfollowAsync`,
+  `IsFollowingAsync`, `GetFollowersAsync`/`GetFollowingAsync` (пагинация
+  Skip/Take как у `NotificationService`), `CountFollowersAsync` (вызывается
+  из Profile/Club/Venue сервисов). `FollowAsync` на `TargetType.User`
+  шлёт `NotificationType.NewFollower` — **первый реальный вызов** этого
+  типа, добавить в `NotificationService.WiredTypes`.
+- `Features/Social/SocialEndpoints.cs`: `POST /api/social/follow`,
+  `DELETE /api/social/follow`, `GET /api/social/followers?targetType=&targetId=`,
+  `GET /api/social/following/{userId}` — все кроме чтения
+  `.RequireAuthorization()`.
+- Добавить `FollowersCount`, `ViewerIsFollowing` в `PublicProfileDto`/
+  `MeProfileDto` (свой `FollowersCount`/`FollowingCount`),
+  `ClubDetailDto`, `VenueDetailDto` — через вызов `FollowService` из
+  `ProfileEndpoints`/`ClubService`/`VenueService` (конструкторная DI, как
+  `ClubService` уже вызывается из `EventService`).
+- `Program.cs`: `AddScoped<FollowService>()`.
+
+#### Фаза 13.2 — Backend: лента (Activity)
+
+- `Features/Social/ActivityDtos.cs`: `ActivityActorDto(Guid,string
+  Handle,string Name,Guid? AvatarId)`, `ActivityEventDto(Guid,string
+  PublicId,string? Title,DateTime StartsAt)`, `ActivityClubDto(Guid,string
+  Slug,string Name)`, `ActivityVenueDto(Guid,string Slug,string Name)`,
+  `ActivityDto(Guid Id, ActivityActorDto Actor, ActivityVerb Verb,
+  ActivityEventDto? Event, ActivityClubDto? Club, ActivityVenueDto?
+  Venue, ActivityActorDto? TargetUser, DateTime CreatedAt)`.
+- `Features/Social/ActivityService.cs`: `EmitAsync(actorId, verb,
+  eventId?, clubId?, venueId?, targetUserId?, ct)` — внутри сам решает
+  писать или нет по правилу видимости выше; `GetFeedAsync(userId, skip,
+  take, ct)` — fan-out on read запрос, `OrderByDescending(CreatedAt)`.
+- Проводка вызовов `EmitAsync`: `EventService.CreateAsync`
+  (`CreatedEvent`, если `Visibility==Public`), `EventService.JoinAsync`
+  (`JoinedEvent`, только момент перехода в `Confirmed`),
+  `ClubService.CreateAsync` (`CreatedClub`, если `Visibility!=Private`),
+  `ClubService.JoinAsync`+`ApproveJoinRequestAsync` (`JoinedClub`, тот же
+  фильтр), `VenueService.UpsertReviewAsync` (`ReviewedVenue`, если
+  `Status==Published`), `ProfileService` upsert вида спорта
+  (`AddedSport`, только при первом добавлении конкретного спорта, не при
+  апдейте, и только если `ProfileVisibility==Public` и `UserSport.Visibility
+  ==Public`).
+- `GET /api/social/feed` в `SocialEndpoints.cs`, `.RequireAuthorization()`.
+- `Program.cs`: `AddScoped<ActivityService>()`, добавить в конструкторы
+  `EventService`/`ClubService`/`VenueService`/`ProfileService`.
+
+#### Фаза 13.3 — Regenerate Kiota + `socialApi.ts`
+
+- `pnpm gen:api` после того, как бэкенд собран.
+- `apps/web/src/lib/socialApi.ts` (по образцу `clubsApi.ts`) — `follow`,
+  `unfollow`, `getFollowers`, `getFollowing`, `getFeed`, все через
+  `fetchWithRefresh`.
+
+#### Фаза 13.4 — Frontend
+
+- `FollowButton.tsx` (клиентский, переключает подписку, принимает
+  `targetType`/`targetId`/`initialIsFollowing`) — на `/[handle]`,
+  `/clubs/[slug]`, `/venues/[slug]`.
+- `/feed` — SSR-каркас + список карточек ленты
+  (`ActivityFeedItem.tsx` — по глаголу рендерит разный текст:
+  «X создал(а) событие Y», «X вступил(а) в клуб Y» и т.д., ссылка на
+  событие/клуб/площадку/актора), пустое состояние «подпишитесь на
+  кого-то» со ссылками на `/venues`/`/clubs`.
+- Счётчики подписчиков/подписок на `/[handle]` (кликабельные →
+  `/[handle]/followers`, `/[handle]/following` — простые списки,
+  без функций управления, по образцу `ClubMembersView.tsx` без
+  admin-кнопок) и `FollowersCount` на `/clubs/[slug]`, `/venues/[slug]`.
+- Пункт «Лента» в `SiteHeader`/`MobileNav` — шапка после Шага 12 уже
+  на пределе по ширине (см. `SettingsMenu` — язык+тема уже схлопнуты в
+  одну иконку), пятый пункт скорее всего потребует вынести
+  Спорт/Площадки во второстепенный dropdown («Ещё») — решить по месту
+  при реализации, не отдельным вопросом пользователю.
+- i18n: `Nav.feed`, namespace `Social` (тексты по каждому `ActivityVerb`,
+  «Подписаться»/«Отписаться», «Подписчики»/«Подписки», пустое состояние).
+
+#### Фаза 13.5 — Сборка и проверка
+
+- `dotnet build` — чисто. `dotnet test` (unit) — 26/26 зелёных, без Docker
+  (интеграционные на Testcontainers/PostGIS локально не поднимались —
+  Docker Desktop не запущен, пользователь проверит на dev-сервере сам).
+- `pnpm --filter web run build` — чисто, все новые роуты (`/feed`,
+  `/[handle]/followers`, `/[handle]/following`) собрались. `pnpm run lint` —
+  без новых ошибок (2 существующих error/2 warning в чужом коде —
+  `ReviewsSection.tsx`/`ThemeToggle.tsx`/`apple-icon.tsx` — не менялись).
+- В браузере не проверялось (см. выше) — честно, не выдаю сборку за
+  визуальную проверку.
+
 ---
 
 ## 9. Конвенции
