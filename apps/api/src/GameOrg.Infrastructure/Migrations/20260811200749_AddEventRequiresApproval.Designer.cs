@@ -3,6 +3,7 @@ using System;
 using GameOrg.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using NetTopologySuite.Geometries;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace GameOrg.Infrastructure.Migrations
 {
     [DbContext(typeof(GameOrgDbContext))]
-    partial class GameOrgDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260811200749_AddEventRequiresApproval")]
+    partial class AddEventRequiresApproval
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

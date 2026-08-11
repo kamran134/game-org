@@ -29,6 +29,8 @@ public sealed class Event
     public int? MinParticipants { get; set; }
     public int? MaxParticipants { get; set; }
     public bool WaitlistEnabled { get; set; } = true;
+    /// <summary>Заявка вместо мгновенной записи (Шаг 19). Всегда false для Club/Unlisted — уже закрытая аудитория.</summary>
+    public bool RequiresApproval { get; set; }
 
     public SkillLevel? SkillLevelMin { get; set; }
     public SkillLevel? SkillLevelMax { get; set; }

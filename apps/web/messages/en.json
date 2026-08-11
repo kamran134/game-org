@@ -252,6 +252,7 @@
       "minParticipants": "Minimum participants",
       "maxParticipants": "Maximum participants",
       "waitlistEnabled": "Waitlist when full",
+      "requiresApproval": "Join requests need approval",
       "costSplit": "Cost",
       "cost": "Amount",
       "currency": "Currency",
@@ -291,9 +292,14 @@
       "Declined": "Declined",
       "LateCancel": "Late cancel",
       "NoShow": "No-show",
-      "Attended": "Attended"
+      "Attended": "Attended",
+      "PendingApproval": "Pending approval"
     },
     "joinConfirmed": "Join",
+    "requestToJoin": "Request to join",
+    "requestPending": "Request pending",
+    "requestAlreadyPending": "You've already requested to join — waiting on the organizer.",
+    "cancelRequest": "Cancel request",
     "joinMaybe": "Maybe",
     "leave": "Leave",
     "joinError": "Failed to join",
@@ -307,6 +313,15 @@
     "cancelConfirm": "Cancel this event? Participants will be notified.",
     "cancelError": "Failed to cancel event",
     "eventCancelledNotice": "This event has been cancelled.",
+    "joinRequests": {
+      "heading": "Join requests",
+      "loading": "Loading…",
+      "none": "No requests yet.",
+      "loadError": "Failed to load requests",
+      "actionError": "Failed to perform action",
+      "approve": "Approve",
+      "reject": "Reject"
+    },
     "teams": {
       "heading": "Teams",
       "edit": "Edit teams",

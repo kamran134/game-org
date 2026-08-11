@@ -11,6 +11,7 @@ import { MvpVoteSection } from "./MvpVoteSection";
 import { RecordResultSection } from "./RecordResultSection";
 import { MyPaymentBanner } from "./MyPaymentBanner";
 import { PaymentsSection } from "./PaymentsSection";
+import { JoinRequestsSection } from "./JoinRequestsSection";
 import { ReportButton } from "@/components/ReportButton";
 
 export const dynamic = "force-dynamic";
@@ -142,6 +143,7 @@ export default async function EventPage({ params }: { params: Promise<{ locale: 
         </div>
 
         <ParticipantsSection apiUrl={apiUrl} locale={locale} event={event} />
+        <JoinRequestsSection apiUrl={apiUrl} event={event} />
         <TeamsSection apiUrl={apiUrl} locale={locale} event={event} />
         <MvpVoteSection apiUrl={apiUrl} event={event} />
         <RecordResultSection apiUrl={apiUrl} locale={locale} event={event} />

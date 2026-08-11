@@ -69,6 +69,7 @@ export function EventForm({
   const [minParticipants, setMinParticipants] = useState(event?.minParticipants?.toString() ?? "");
   const [maxParticipants, setMaxParticipants] = useState(event?.maxParticipants?.toString() ?? "");
   const [waitlistEnabled, setWaitlistEnabled] = useState(event?.waitlistEnabled ?? true);
+  const [requiresApproval, setRequiresApproval] = useState(event?.requiresApproval ?? true);
   const [costSplit, setCostSplit] = useState<CostSplit>(event?.costSplit ?? "Free");
   const [cost, setCost] = useState(event?.cost?.toString() ?? "");
   const [currency, setCurrency] = useState(event?.currency ?? "AZN");
@@ -127,6 +128,7 @@ export function EventForm({
         minParticipants: minParticipants ? Number(minParticipants) : null,
         maxParticipants: maxParticipants ? Number(maxParticipants) : null,
         waitlistEnabled,
+        requiresApproval: visibility === "Public" ? requiresApproval : false,
         costSplit,
         cost: costSplit !== "Free" && cost ? Number(cost) : null,
         currency,
@@ -268,6 +270,13 @@ export function EventForm({
         <input type="checkbox" checked={waitlistEnabled} onChange={(e) => setWaitlistEnabled(e.target.checked)} />
         {t("fields.waitlistEnabled")}
       </label>
+
+      {visibility === "Public" && (
+        <label className="flex items-center gap-2 text-sm text-foreground">
+          <input type="checkbox" checked={requiresApproval} onChange={(e) => setRequiresApproval(e.target.checked)} />
+          {t("fields.requiresApproval")}
+        </label>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <label className="flex flex-col gap-1">

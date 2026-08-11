@@ -12,7 +12,8 @@ export type EventVisibility = "Public" | "Club" | "Unlisted";
 export type SkillLevel = "Beginner" | "Amateur" | "Intermediate" | "Advanced" | "SemiPro" | "Pro";
 export type GenderPolicy = "Any" | "MenOnly" | "WomenOnly" | "MixedRequired";
 export type CostSplit = "Free" | "PerPlayer" | "Total";
-export type ParticipationStatus = "Confirmed" | "Maybe" | "Waitlisted" | "Declined" | "LateCancel" | "NoShow" | "Attended";
+export type ParticipationStatus =
+  | "Confirmed" | "Maybe" | "Waitlisted" | "Declined" | "LateCancel" | "NoShow" | "Attended" | "PendingApproval";
 
 export type EventSportItem = {
   id: string;
@@ -74,6 +75,8 @@ export type EventResult = {
 
 export type MvpTallyEntry = { userId: string; displayName: string; votes: number };
 
+export type EventJoinRequestItem = { participantId: string; userId: string; displayName: string; requestedAt: string };
+
 export type EventDetail = {
   id: string;
   publicId: string;
@@ -92,6 +95,7 @@ export type EventDetail = {
   minParticipants?: number | null;
   maxParticipants?: number | null;
   waitlistEnabled: boolean;
+  requiresApproval: boolean;
   skillLevelMin?: SkillLevel | null;
   skillLevelMax?: SkillLevel | null;
   genderPolicy: GenderPolicy;
@@ -136,6 +140,7 @@ export type CreateEventRequest = {
   minParticipants?: number | null;
   maxParticipants?: number | null;
   waitlistEnabled?: boolean | null;
+  requiresApproval?: boolean | null;
   skillLevelMin?: SkillLevel | null;
   skillLevelMax?: SkillLevel | null;
   genderPolicy?: GenderPolicy | null;
@@ -267,6 +272,33 @@ export async function leaveEvent(apiUrl: string, locale: string, eventId: string
     headers: localeHeaders(locale),
   });
   if (!res.ok && res.status !== 404) throw new Error(`Не удалось отменить запись (${res.status})`);
+}
+
+export async function getEventJoinRequests(apiUrl: string, locale: string, eventId: string): Promise<EventJoinRequestItem[]> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/events/${eventId}/join-requests`, {
+    credentials: "include",
+    headers: localeHeaders(locale),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Не удалось загрузить заявки (${res.status})`));
+  return res.json();
+}
+
+export async function approveEventJoinRequest(apiUrl: string, locale: string, eventId: string, participantId: string): Promise<void> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/events/${eventId}/participants/${participantId}/approve`, {
+    method: "POST",
+    credentials: "include",
+    headers: localeHeaders(locale),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Не удалось одобрить заявку (${res.status})`));
+}
+
+export async function rejectEventJoinRequest(apiUrl: string, locale: string, eventId: string, participantId: string): Promise<void> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/events/${eventId}/participants/${participantId}/reject`, {
+    method: "POST",
+    credentials: "include",
+    headers: localeHeaders(locale),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Не удалось отклонить заявку (${res.status})`));
 }
 
 export async function addEventGuest(

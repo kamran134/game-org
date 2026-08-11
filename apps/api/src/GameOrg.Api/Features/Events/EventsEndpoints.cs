@@ -249,6 +249,80 @@ public static class EventsEndpoints
         .Produces(StatusCodes.Status400BadRequest)
         .Produces(StatusCodes.Status404NotFound);
 
+        app.MapGet("/api/events/{id:guid}/join-requests", async (
+            Guid id, ClaimsPrincipal principal, EventService eventService, HttpContext ctx, CancellationToken ct) =>
+        {
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            var locale = RequestLocale.Resolve(ctx.Request.Headers.AcceptLanguage.ToString());
+            var (result, error) = await eventService.GetJoinRequestsAsync(id, userId.Value, IsModeratorOrAdmin(principal), locale, ct);
+            if (error is not null)
+            {
+                var status = error == "Событие не найдено." ? StatusCodes.Status404NotFound : StatusCodes.Status403Forbidden;
+                return Results.Problem(error, statusCode: status);
+            }
+
+            return Results.Ok(result);
+        })
+        .WithName("GetEventJoinRequests")
+        .WithTags("Events")
+        .RequireAuthorization()
+        .Produces<List<EventJoinRequestDto>>()
+        .Produces(StatusCodes.Status403Forbidden)
+        .Produces(StatusCodes.Status404NotFound);
+
+        app.MapPost("/api/events/{id:guid}/participants/{participantId:guid}/approve", async (
+            Guid id, Guid participantId, ClaimsPrincipal principal, EventService eventService, CancellationToken ct) =>
+        {
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            var (ok, error) = await eventService.ApproveJoinAsync(id, participantId, userId.Value, IsModeratorOrAdmin(principal), ct);
+            if (!ok)
+            {
+                var status = error is "Событие не найдено." or "Заявка не найдена."
+                    ? StatusCodes.Status404NotFound
+                    : error!.StartsWith("Одобрять")
+                        ? StatusCodes.Status403Forbidden
+                        : StatusCodes.Status400BadRequest;
+                return Results.Problem(error, statusCode: status);
+            }
+
+            return Results.NoContent();
+        })
+        .WithName("ApproveEventJoinRequest")
+        .WithTags("Events")
+        .RequireAuthorization()
+        .Produces(StatusCodes.Status400BadRequest)
+        .Produces(StatusCodes.Status403Forbidden)
+        .Produces(StatusCodes.Status404NotFound);
+
+        app.MapPost("/api/events/{id:guid}/participants/{participantId:guid}/reject", async (
+            Guid id, Guid participantId, ClaimsPrincipal principal, EventService eventService, CancellationToken ct) =>
+        {
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            var (ok, error) = await eventService.RejectJoinAsync(id, participantId, userId.Value, IsModeratorOrAdmin(principal), ct);
+            if (!ok)
+            {
+                var status = error is "Событие не найдено." or "Заявка не найдена."
+                    ? StatusCodes.Status404NotFound
+                    : error!.StartsWith("Отклонять")
+                        ? StatusCodes.Status403Forbidden
+                        : StatusCodes.Status400BadRequest;
+                return Results.Problem(error, statusCode: status);
+            }
+
+            return Results.NoContent();
+        })
+        .WithName("RejectEventJoinRequest")
+        .WithTags("Events")
+        .RequireAuthorization()
+        .Produces(StatusCodes.Status403Forbidden)
+        .Produces(StatusCodes.Status404NotFound);
+
         app.MapPost("/api/events/{id:guid}/guests", async (
             Guid id,
             AddGuestRequest request,

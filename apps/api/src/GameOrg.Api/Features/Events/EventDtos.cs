@@ -52,6 +52,7 @@ public sealed record EventDetailDto(
     int? MinParticipants,
     int? MaxParticipants,
     bool WaitlistEnabled,
+    bool RequiresApproval,
     SkillLevel? SkillLevelMin,
     SkillLevel? SkillLevelMax,
     GenderPolicy GenderPolicy,
@@ -99,6 +100,7 @@ public sealed record UpdateEventRequest(
     int? MinParticipants,
     int? MaxParticipants,
     bool? WaitlistEnabled,
+    bool? RequiresApproval,
     SkillLevel? SkillLevelMin,
     SkillLevel? SkillLevelMax,
     GenderPolicy? GenderPolicy,
@@ -124,6 +126,7 @@ public sealed record CreateEventRequest(
     int? MinParticipants,
     int? MaxParticipants,
     bool? WaitlistEnabled,
+    bool? RequiresApproval,
     SkillLevel? SkillLevelMin,
     SkillLevel? SkillLevelMax,
     GenderPolicy? GenderPolicy,
@@ -134,9 +137,11 @@ public sealed record CreateEventRequest(
     string? Currency,
     int? LockHoursBeforeStart);
 
-/// <summary>Status — только Confirmed или Maybe; остальное (Waitlisted, Declined...) — считает сервер.</summary>
+/// <summary>Status — только Confirmed или Maybe; остальное (Waitlisted, PendingApproval, Declined...) — считает сервер.</summary>
 public sealed record JoinEventRequest(ParticipationStatus Status);
 
 public sealed record AddGuestRequest(string GuestName);
 
 public sealed record CancelEventRequest(string? Reason);
+
+public sealed record EventJoinRequestDto(Guid ParticipantId, Guid UserId, string DisplayName, DateTime RequestedAt);

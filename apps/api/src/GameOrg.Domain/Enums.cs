@@ -35,7 +35,7 @@ public enum CostSplit { Free, PerPlayer, Total }
 
 public enum GenderPolicy { Any, MenOnly, WomenOnly, MixedRequired }
 
-public enum ParticipationStatus { Confirmed, Maybe, Waitlisted, Declined, LateCancel, NoShow, Attended }
+public enum ParticipationStatus { Confirmed, Maybe, Waitlisted, Declined, LateCancel, NoShow, Attended, PendingApproval }
 
 public enum PaymentStatus { Pending, Paid, Failed, Refunded, Cancelled }
 
@@ -57,6 +57,8 @@ public enum NotificationType
     // Не было зарезервировано в Шаге 2 — добавлено в Шаге 16. Хранится строкой
     // в БД (HasConversion<string>()), добавление значения не ломает существующие данные.
     AchievementEarned,
+    // Шаг 19 — заявки на события с RequiresApproval.
+    EventJoinRequest, EventJoinApproved, EventJoinRejected,
 }
 
 public enum DeliveryStatus { Queued, Sent, Failed, Skipped }

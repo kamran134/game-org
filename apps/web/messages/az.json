@@ -252,6 +252,7 @@
       "minParticipants": "Minimum iştirakçı",
       "maxParticipants": "Maksimum iştirakçı",
       "waitlistEnabled": "Dolduqda gözləmə siyahısı",
+      "requiresApproval": "İştirak sorğuları təsdiq tələb edir",
       "costSplit": "Qiymət",
       "cost": "Məbləğ",
       "currency": "Valyuta",
@@ -291,9 +292,14 @@
       "Declined": "İmtina etdi",
       "LateCancel": "Gec ləğv",
       "NoShow": "Gəlmədi",
-      "Attended": "İştirak etdi"
+      "Attended": "İştirak etdi",
+      "PendingApproval": "Sorğu baxılır"
     },
     "joinConfirmed": "Yazıl",
+    "requestToJoin": "Sorğu göndər",
+    "requestPending": "Sorğu baxılır",
+    "requestAlreadyPending": "Siz artıq sorğu göndərmisiniz — təşkilatçının qərarını gözləyin.",
+    "cancelRequest": "Sorğunu ləğv et",
     "joinMaybe": "Bəlkə gələcəm",
     "leave": "Qeydiyyatı ləğv et",
     "joinError": "Yazıla bilmədi",
@@ -307,6 +313,15 @@
     "cancelConfirm": "Tədbiri ləğv etmək istədiyinizə əminsiniz? İştirakçılara bildiriş gedəcək.",
     "cancelError": "Tədbir ləğv edilmədi",
     "eventCancelledNotice": "Bu tədbir ləğv edilib.",
+    "joinRequests": {
+      "heading": "İştirak sorğuları",
+      "loading": "Yüklənir…",
+      "none": "Hələ sorğu yoxdur.",
+      "loadError": "Sorğular yüklənmədi",
+      "actionError": "Əməliyyat yerinə yetirilmədi",
+      "approve": "Təsdiqlə",
+      "reject": "Rədd et"
+    },
     "teams": {
       "heading": "Komandalar",
       "edit": "Komandaları dəyiş",

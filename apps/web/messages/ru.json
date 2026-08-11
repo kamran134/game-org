@@ -252,6 +252,7 @@
       "minParticipants": "Минимум участников",
       "maxParticipants": "Максимум участников",
       "waitlistEnabled": "Лист ожидания при заполнении",
+      "requiresApproval": "Заявки на участие требуют подтверждения",
       "costSplit": "Стоимость",
       "cost": "Сумма",
       "currency": "Валюта",
@@ -291,9 +292,14 @@
       "Declined": "Отказался",
       "LateCancel": "Поздняя отмена",
       "NoShow": "Не пришёл",
-      "Attended": "Был"
+      "Attended": "Был",
+      "PendingApproval": "Заявка на рассмотрении"
     },
     "joinConfirmed": "Записаться",
+    "requestToJoin": "Подать заявку",
+    "requestPending": "Заявка на рассмотрении",
+    "requestAlreadyPending": "Вы уже подали заявку — ждите решения организатора.",
+    "cancelRequest": "Отменить заявку",
     "joinMaybe": "Возможно приду",
     "leave": "Отменить запись",
     "joinError": "Не удалось записаться",
@@ -307,6 +313,15 @@
     "cancelConfirm": "Точно отменить событие? Участники получат уведомление.",
     "cancelError": "Не удалось отменить событие",
     "eventCancelledNotice": "Это событие отменено.",
+    "joinRequests": {
+      "heading": "Заявки на участие",
+      "loading": "Загрузка…",
+      "none": "Заявок пока нет.",
+      "loadError": "Не удалось загрузить заявки",
+      "actionError": "Не удалось выполнить действие",
+      "approve": "Одобрить",
+      "reject": "Отклонить"
+    },
     "teams": {
       "heading": "Команды",
       "edit": "Изменить команды",

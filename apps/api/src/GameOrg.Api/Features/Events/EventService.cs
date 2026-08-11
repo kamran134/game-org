@@ -45,6 +45,9 @@ public sealed class EventService(
             MinParticipants = request.MinParticipants,
             MaxParticipants = request.MaxParticipants,
             WaitlistEnabled = request.WaitlistEnabled ?? true,
+            // Public по умолчанию требует одобрения организатором; Club/Unlisted —
+            // аудитория уже закрытая, форсим false независимо от запроса (Шаг 19).
+            RequiresApproval = request.Visibility == EventVisibility.Public && (request.RequiresApproval ?? true),
             SkillLevelMin = request.SkillLevelMin,
             SkillLevelMax = request.SkillLevelMax,
             GenderPolicy = request.GenderPolicy ?? GenderPolicy.Any,
@@ -83,6 +86,7 @@ public sealed class EventService(
         var customLocationBefore = ev.CustomLocation;
 
         if (request.Visibility is not null) ev.Visibility = request.Visibility.Value;
+        if (request.RequiresApproval is not null) ev.RequiresApproval = request.RequiresApproval.Value;
         if (request.VenueId is not null) ev.VenueId = request.VenueId;
         if (request.CustomLocation is not null) ev.CustomLocation = request.CustomLocation.Length == 0 ? null : request.CustomLocation;
         if (request.Title is not null) ev.TitleI18n = request.Title.ToDict();
@@ -102,6 +106,10 @@ public sealed class EventService(
         if (request.Cost is not null) ev.Cost = request.Cost;
         if (request.Currency is not null) ev.Currency = request.Currency;
         if (request.LockHoursBeforeStart is not null) ev.LockHoursBeforeStart = request.LockHoursBeforeStart;
+
+        // Club/Unlisted — закрытая аудитория, approval там бессмысленен (Шаг 19),
+        // независимо от того, что стоит в базе или пришло в этом же запросе.
+        if (ev.Visibility != EventVisibility.Public) ev.RequiresApproval = false;
 
         var error = ValidateInvariants(ev);
         if (error is not null) return (false, error);
@@ -447,13 +455,21 @@ public sealed class EventService(
         var already = await db.EventParticipants.AnyAsync(p => p.EventId == eventId && p.UserId == userId, ct);
         if (already) return (null, "Вы уже записаны на это событие.");
 
-        var (status, waitlistOrder, capacityError) = await ResolveJoinStatusAsync(ev, request.Status, ct);
+        // Создатель себя не спрашивает; PendingApproval минует резолвинг вейтлиста
+        // целиком — место/вейтлист решаются в момент ApproveJoinAsync, не сейчас.
+        var needsApproval = ev.RequiresApproval && ev.CreatedById != userId;
+
+        var (status, waitlistOrder, capacityError) = needsApproval
+            ? (ParticipationStatus.PendingApproval, (int?)null, (string?)null)
+            : await ResolveJoinStatusAsync(ev, request.Status, ct);
         if (capacityError is not null) return (null, capacityError);
 
         var participant = new EventParticipant { EventId = eventId, UserId = userId, Status = status, WaitlistOrder = waitlistOrder };
         db.EventParticipants.Add(participant);
         await db.SaveChangesAsync(ct);
-        await RecomputeCountsAsync(eventId, ct);
+
+        if (status != ParticipationStatus.PendingApproval)
+            await RecomputeCountsAsync(eventId, ct);
 
         if (status == ParticipationStatus.Confirmed)
         {
@@ -468,9 +484,11 @@ public sealed class EventService(
         {
             await notificationSender.SendAsync(
                 creatorId,
-                NotificationType.ParticipantJoined,
-                $"PARTICIPANT_JOINED:{eventId}:{participant.Id}",
-                "Новая запись на ваше событие.",
+                status == ParticipationStatus.PendingApproval ? NotificationType.EventJoinRequest : NotificationType.ParticipantJoined,
+                status == ParticipationStatus.PendingApproval
+                    ? $"EVENT_JOIN_REQUEST:{eventId}:{participant.Id}"
+                    : $"PARTICIPANT_JOINED:{eventId}:{participant.Id}",
+                status == ParticipationStatus.PendingApproval ? "Новая заявка на ваше событие." : "Новая запись на ваше событие.",
                 new Dictionary<string, object> { ["eventId"] = eventId.ToString() },
                 ct);
         }
@@ -479,6 +497,91 @@ public sealed class EventService(
         return (new EventParticipantDto(
             participant.Id, userId, Localized.Resolve(user.DisplayNameI18n, locale) ?? "",
             null, participant.Status, participant.WaitlistOrder, participant.JoinedAt), null);
+    }
+
+    /// <summary>Заявки, ждущие решения — организатор, владелец/админ клуба события или модератор.</summary>
+    public async Task<(List<EventJoinRequestDto>? Result, string? Error)> GetJoinRequestsAsync(
+        Guid eventId, Guid viewerId, bool isModerator, string locale, CancellationToken ct)
+    {
+        var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == eventId, ct);
+        if (ev is null) return (null, "Событие не найдено.");
+        if (!await CanManageJoinRequestsAsync(ev, viewerId, isModerator, ct)) return (null, "Заявки видит только организатор, админ клуба или модератор.");
+
+        var requests = await db.EventParticipants
+            .Where(p => p.EventId == eventId && p.Status == ParticipationStatus.PendingApproval)
+            .Include(p => p.User)
+            .OrderBy(p => p.JoinedAt)
+            .ToListAsync(ct);
+
+        return (requests.Select(p => new EventJoinRequestDto(
+            p.Id, p.UserId!.Value, Localized.Resolve(p.User!.DisplayNameI18n, locale) ?? "", p.JoinedAt)).ToList(), null);
+    }
+
+    /// <summary>Одобрение — обычный конвейер вейтлиста (полное событие уводит в очередь, не переполняет).</summary>
+    public async Task<(bool Ok, string? Error)> ApproveJoinAsync(Guid eventId, Guid participantId, Guid actorId, bool isModerator, CancellationToken ct)
+    {
+        var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == eventId, ct);
+        if (ev is null) return (false, "Событие не найдено.");
+        if (!await CanManageJoinRequestsAsync(ev, actorId, isModerator, ct)) return (false, "Одобрять заявки может только организатор, админ клуба или модератор.");
+
+        var participant = await db.EventParticipants.FirstOrDefaultAsync(
+            p => p.Id == participantId && p.EventId == eventId && p.Status == ParticipationStatus.PendingApproval, ct);
+        if (participant is null) return (false, "Заявка не найдена.");
+
+        var (status, waitlistOrder, capacityError) = await ResolveJoinStatusAsync(ev, ParticipationStatus.Confirmed, ct);
+        if (capacityError is not null) return (false, capacityError);
+
+        participant.Status = status;
+        participant.WaitlistOrder = waitlistOrder;
+        participant.StatusChangedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        await RecomputeCountsAsync(eventId, ct);
+
+        if (status == ParticipationStatus.Confirmed)
+        {
+            await paymentService.EnsurePaymentAsync(eventId, participant.Id, ct);
+            await paymentService.RecomputeTotalSplitAsync(eventId, ct);
+            if (ev.Visibility == EventVisibility.Public)
+                await activityService.EmitAsync(participant.UserId!.Value, ActivityVerb.JoinedEvent, eventId, null, null, null, ct);
+        }
+
+        await notificationSender.SendAsync(
+            participant.UserId!.Value, NotificationType.EventJoinApproved,
+            $"EVENT_JOIN_APPROVED:{eventId}:{participant.Id}",
+            "Ваша заявка на событие одобрена.",
+            new Dictionary<string, object> { ["eventId"] = eventId.ToString() }, ct);
+
+        return (true, null);
+    }
+
+    /// <summary>Отклонение удаляет заявку — не тумбстоун, человек может подать заново.</summary>
+    public async Task<(bool Ok, string? Error)> RejectJoinAsync(Guid eventId, Guid participantId, Guid actorId, bool isModerator, CancellationToken ct)
+    {
+        var ev = await db.Events.FirstOrDefaultAsync(e => e.Id == eventId, ct);
+        if (ev is null) return (false, "Событие не найдено.");
+        if (!await CanManageJoinRequestsAsync(ev, actorId, isModerator, ct)) return (false, "Отклонять заявки может только организатор, админ клуба или модератор.");
+
+        var participant = await db.EventParticipants.FirstOrDefaultAsync(
+            p => p.Id == participantId && p.EventId == eventId && p.Status == ParticipationStatus.PendingApproval, ct);
+        if (participant is null) return (false, "Заявка не найдена.");
+
+        var requesterId = participant.UserId!.Value;
+        db.EventParticipants.Remove(participant);
+        await db.SaveChangesAsync(ct);
+
+        await notificationSender.SendAsync(
+            requesterId, NotificationType.EventJoinRejected,
+            $"EVENT_JOIN_REJECTED:{eventId}:{participantId}",
+            "Ваша заявка на событие отклонена.",
+            new Dictionary<string, object> { ["eventId"] = eventId.ToString() }, ct);
+
+        return (true, null);
+    }
+
+    private async Task<bool> CanManageJoinRequestsAsync(Event ev, Guid userId, bool isModerator, CancellationToken ct)
+    {
+        if (isModerator || ev.CreatedById == userId) return true;
+        return ev.ClubId is Guid clubId && await clubService.IsOwnerOrAdminAsync(clubId, userId, ct);
     }
 
     public async Task<bool> LeaveAsync(Guid eventId, Guid userId, CancellationToken ct)
@@ -734,13 +837,18 @@ public sealed class EventService(
         Localized.Resolve(e.TitleI18n, locale),
         Localized.Resolve(e.DescriptionI18n, locale),
         e.StartsAt, e.EndsAt, e.Timezone,
-        e.MinParticipants, e.MaxParticipants, e.WaitlistEnabled,
+        e.MinParticipants, e.MaxParticipants, e.WaitlistEnabled, e.RequiresApproval,
         e.SkillLevelMin, e.SkillLevelMax, e.GenderPolicy, e.AgeMin, e.AgeMax,
         e.CostSplit, e.Cost, e.Currency,
         e.RegistrationOpensAt, e.RegistrationClosesAt, e.LockHoursBeforeStart,
         e.ConfirmedCount, e.MaybeCount, e.WaitlistCount,
         e.CreatedById, e.CancelledAt, e.CancelReason,
-        e.Participants.OrderBy(p => p.JoinedAt).Select(p => new EventParticipantDto(
+        // PendingApproval не в общем списке — кто подал заявку, видит только тот,
+        // кто её разбирает (GetJoinRequestsAsync); не светим ждущих одобрения
+        // всем подряд посетителям страницы (Шаг 19). Сам заявитель узнаёт статус
+        // из ответа JoinAsync сразу после отправки — до решения организатора
+        // страница при перезагрузке этого не покажет, известное упрощение.
+        e.Participants.Where(p => p.Status != ParticipationStatus.PendingApproval).OrderBy(p => p.JoinedAt).Select(p => new EventParticipantDto(
             p.Id, p.UserId,
             p.UserId is not null ? Localized.Resolve(p.User!.DisplayNameI18n, locale) ?? "" : p.GuestName ?? "",
             p.GuestName, p.Status, p.WaitlistOrder, p.JoinedAt)).ToList(),
