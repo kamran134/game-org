@@ -7,13 +7,15 @@ using GameOrg.Domain;
 using GameOrg.Domain.Entities;
 using GameOrg.Infrastructure;
 using GameOrg.Infrastructure.Notifications;
+using GameOrg.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
 
 namespace GameOrg.Api.Features.Clubs;
 
-/// <summary>CRUD клубов и управление участниками.</summary>
+/// <summary>CRUD клубов и управление участниками. Group (Шаг 20) — не отдельная сущность, а Club.Kind.</summary>
 public sealed class ClubService(
-    GameOrgDbContext db, NotificationSender notificationSender, FollowService followService, ActivityService activityService)
+    GameOrgDbContext db, NotificationSender notificationSender, FollowService followService,
+    ActivityService activityService, R2StorageService storage)
 {
     public async Task<(Club? Result, string? Error)> CreateAsync(Guid userId, CreateClubRequest request, CancellationToken ct)
     {
@@ -29,6 +31,7 @@ public sealed class ClubService(
             DescriptionI18n = request.Description?.ToDict(),
             CityId = request.CityId,
             Visibility = request.Visibility ?? ClubVisibility.Public,
+            Kind = request.Kind ?? ClubKind.Club,
             CreatedById = userId,
             MembersCount = 1,
         };
@@ -93,6 +96,7 @@ public sealed class ClubService(
     {
         var club = await db.Clubs
             .Include(c => c.City)
+            .Include(c => c.Avatar)
             .Include(c => c.Sports).ThenInclude(s => s.Sport)
             .FirstOrDefaultAsync(c => c.Slug == slug, ct);
 
@@ -110,7 +114,7 @@ public sealed class ClubService(
         return MapDetail(club, locale, viewerMembership, followersCount, viewerIsFollowing);
     }
 
-    public async Task<List<ClubDto>> GetListAsync(string locale, Guid? viewerId, Guid? cityId, Guid? sportId, CancellationToken ct)
+    public async Task<List<ClubDto>> GetListAsync(string locale, Guid? viewerId, Guid? cityId, Guid? sportId, ClubKind? kind, CancellationToken ct)
     {
         // Private — только клубы, где viewer активный участник; остальным как будто их нет в каталоге.
         var viewerClubIds = viewerId is null
@@ -123,16 +127,16 @@ public sealed class ClubService(
         var query = db.Clubs.Where(c => c.Visibility != ClubVisibility.Private || viewerClubIds.Contains(c.Id));
         if (cityId is not null) query = query.Where(c => c.CityId == cityId);
         if (sportId is not null) query = query.Where(c => c.Sports.Any(s => s.SportId == sportId));
+        if (kind is not null) query = query.Where(c => c.Kind == kind);
 
         var clubs = await query
             .Include(c => c.City)
+            .Include(c => c.Avatar)
             .OrderByDescending(c => c.MembersCount)
             .Take(50)
             .ToListAsync(ct);
 
-        return clubs.Select(c => new ClubDto(
-            c.Id, c.Slug, Localized.Resolve(c.NameI18n, locale) ?? "",
-            MapCity(c.City), c.Visibility, c.MembersCount, c.EventsCount)).ToList();
+        return clubs.Select(MapListItem(locale)).ToList();
     }
 
     /// <summary>Клубы, где viewer активный участник — для селектора клуба в форме события (ClubId требует активного членства).</summary>
@@ -142,12 +146,16 @@ public sealed class ClubService(
             .Where(m => m.UserId == userId && m.Status == MembershipStatus.Active)
             .Select(m => m.Club)
             .Include(c => c.City)
+            .Include(c => c.Avatar)
             .ToListAsync(ct);
 
-        return clubs.Select(c => new ClubDto(
-            c.Id, c.Slug, Localized.Resolve(c.NameI18n, locale) ?? "",
-            MapCity(c.City), c.Visibility, c.MembersCount, c.EventsCount)).ToList();
+        return clubs.Select(MapListItem(locale)).ToList();
     }
+
+    private Func<Club, ClubDto> MapListItem(string locale) => c => new ClubDto(
+        c.Id, c.Slug, Localized.Resolve(c.NameI18n, locale) ?? "",
+        MapCity(c.City), c.Visibility, c.Kind, c.Avatar is null ? null : storage.GetPublicUrl(c.Avatar.BucketKey),
+        c.MembersCount, c.EventsCount);
 
     /// <summary>Только Owner. Soft-delete — DeletedAt, глобальный HasQueryFilter уже прячет клуб из всех выдач.</summary>
     public async Task<(bool Ok, string? Error)> DeleteAsync(Guid clubId, Guid userId, CancellationToken ct)
@@ -429,6 +437,41 @@ public sealed class ClubService(
         throw new InvalidOperationException("Не удалось сгенерировать уникальный код приглашения после 5 попыток.");
     }
 
+    /// <summary>Одна MediaAsset на клуб (AvatarId) — не галерея, тот же presign-приём, что VenueService.PresignPhotoAsync.</summary>
+    public async Task<(PresignClubAvatarResponse? Result, string? Error)> PresignAvatarAsync(
+        Guid clubId, Guid userId, PresignClubAvatarRequest request, CancellationToken ct)
+    {
+        if (!storage.IsConfigured) return (null, "Загрузка медиа пока не настроена на сервере.");
+        if (!await IsOwnerOrAdminAsync(clubId, userId, ct)) return (null, "Загружать логотип может только владелец или админ клуба.");
+        if (!request.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)) return (null, "Разрешены только изображения.");
+
+        var extension = request.ContentType.Split('/') is [_, var ext] ? ext : "bin";
+        var key = $"clubs/{clubId}/avatar-{Guid.CreateVersion7()}.{extension}";
+
+        var media = new MediaAsset { OwnerId = userId, Kind = MediaKind.Image, BucketKey = key, MimeType = request.ContentType, SizeBytes = 0 };
+        db.MediaAssets.Add(media);
+        await db.SaveChangesAsync(ct);
+
+        var uploadUrl = await storage.GetPresignedUploadUrlAsync(key, request.ContentType, TimeSpan.FromMinutes(15));
+        return (new PresignClubAvatarResponse(media.Id, uploadUrl, storage.GetPublicUrl(key)), null);
+    }
+
+    public async Task<(bool Ok, string? Error)> SetAvatarAsync(Guid clubId, Guid userId, AttachClubAvatarRequest request, CancellationToken ct)
+    {
+        if (!await IsOwnerOrAdminAsync(clubId, userId, ct)) return (false, "Менять логотип может только владелец или админ клуба.");
+
+        var club = await db.Clubs.FirstOrDefaultAsync(c => c.Id == clubId, ct);
+        if (club is null) return (false, "Клуб не найден.");
+
+        var media = await db.MediaAssets.FirstOrDefaultAsync(m => m.Id == request.MediaId && m.OwnerId == userId, ct);
+        if (media is null) return (false, "Медиа не найдено.");
+
+        club.AvatarId = media.Id;
+        club.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return (true, null);
+    }
+
     private async Task RecomputeMembersCountAsync(Guid clubId, CancellationToken ct)
     {
         var club = await db.Clubs.FirstOrDefaultAsync(c => c.Id == clubId, ct);
@@ -457,7 +500,9 @@ public sealed class ClubService(
             club.Id, club.Slug,
             Localized.Resolve(club.NameI18n, locale) ?? "",
             Localized.Resolve(club.DescriptionI18n, locale),
-            MapCity(club.City), club.Visibility, club.MembersCount, club.EventsCount, club.CreatedById,
+            MapCity(club.City), club.Visibility, club.Kind,
+            club.Avatar is null ? null : storage.GetPublicUrl(club.Avatar.BucketKey),
+            club.MembersCount, club.EventsCount, club.CreatedById,
             viewerIsManager ? club.InviteCode : null,
             viewerMembership?.Role, viewerMembership?.Status,
             followersCount, viewerIsFollowing,

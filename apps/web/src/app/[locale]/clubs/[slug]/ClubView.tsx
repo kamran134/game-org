@@ -83,14 +83,27 @@ export function ClubView({ apiUrl, locale, slug }: { apiUrl: string; locale: str
   return (
     <main className="flex-1 bg-brand-background px-6 py-16">
       <div className="mx-auto flex max-w-3xl flex-col gap-6">
-        <Link href="/clubs" className="text-sm text-foreground/60 transition-colors duration-200 hover:text-foreground">
-          ← {t("backToList")}
+        <Link
+          href={club.kind === "Group" ? "/groups" : "/clubs"}
+          className="text-sm text-foreground/60 transition-colors duration-200 hover:text-foreground"
+        >
+          ← {club.kind === "Group" ? t("backToListGroups") : t("backToList")}
         </Link>
 
         <div className="rounded-2xl border border-brand-border bg-background p-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
-              <h1 className="font-heading text-3xl font-semibold text-foreground">{club.name}</h1>
+            <div className="flex items-start gap-4">
+              {club.avatarUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={club.avatarUrl} alt="" className="h-16 w-16 shrink-0 rounded-2xl object-cover" />
+              )}
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="font-heading text-3xl font-semibold text-foreground">{club.name}</h1>
+                  {club.kind === "Group" && (
+                    <span className="rounded-full bg-brand-muted px-2.5 py-0.5 text-xs font-medium text-foreground/60">{t("groupBadge")}</span>
+                  )}
+                </div>
               <p className="mt-2 flex items-center gap-1.5 text-sm text-foreground/60">
                 <Users size={16} weight="bold" />
                 {t("membersCount", { count: club.membersCount })}
@@ -102,6 +115,7 @@ export function ClubView({ apiUrl, locale, slug }: { apiUrl: string; locale: str
                   {club.city.nameI18n[locale] ?? club.city.slug}
                 </p>
               )}
+              </div>
             </div>
             {club.viewerStatus === "Pending" && (
               <span className="rounded-full bg-amber-500/15 px-3 py-1 text-sm font-medium text-amber-600 dark:text-amber-400">

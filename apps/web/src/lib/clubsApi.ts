@@ -4,6 +4,7 @@ import type { LocalizedText } from "@/lib/localized";
 import { fetchWithRefresh } from "@/lib/fetchWithRefresh";
 
 export type ClubVisibility = "Public" | "RequestOnly" | "Private";
+export type ClubKind = "Club" | "Group";
 export type ClubRole = "Owner" | "Admin" | "Member";
 export type MembershipStatus = "Pending" | "Active" | "Banned" | "Left";
 
@@ -15,6 +16,8 @@ export type ClubListItem = {
   name: string;
   city?: ClubCity | null;
   visibility: ClubVisibility;
+  kind: ClubKind;
+  avatarUrl?: string | null;
   membersCount: number;
   eventsCount: number;
 };
@@ -35,6 +38,8 @@ export type ClubDetail = {
   description?: string | null;
   city?: ClubCity | null;
   visibility: ClubVisibility;
+  kind: ClubKind;
+  avatarUrl?: string | null;
   membersCount: number;
   eventsCount: number;
   createdById?: string | null;
@@ -64,10 +69,14 @@ export type CreateClubRequest = {
   description?: LocalizedText | null;
   cityId?: string | null;
   visibility?: ClubVisibility | null;
+  // Неизменяем после создания — как sportId у событий, см. ClubDtos.cs.
+  kind?: ClubKind | null;
   sportIds?: string[] | null;
 };
 
-export type UpdateClubRequest = Partial<CreateClubRequest>;
+export type UpdateClubRequest = Partial<Omit<CreateClubRequest, "kind">>;
+
+export type PresignClubAvatarResponse = { mediaId: string; uploadUrl: string; publicUrl: string };
 
 function apiBase(apiUrl: string): string {
   return apiUrl.replace(/\/api\/?$/, "");
@@ -86,11 +95,12 @@ async function errorMessage(res: Response, fallback: string): Promise<string> {
 export async function getClubs(
   apiUrl: string,
   locale: string,
-  params: { cityId?: string; sportId?: string } = {},
+  params: { cityId?: string; sportId?: string; kind?: ClubKind } = {},
 ): Promise<ClubListItem[]> {
   const query = new URLSearchParams();
   if (params.cityId) query.set("cityId", params.cityId);
   if (params.sportId) query.set("sportId", params.sportId);
+  if (params.kind) query.set("kind", params.kind);
 
   const res = await fetch(`${apiBase(apiUrl)}/api/clubs?${query.toString()}`, {
     cache: "no-store",
@@ -152,6 +162,27 @@ export async function updateClub(apiUrl: string, locale: string, id: string, bod
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(await errorMessage(res, `Не удалось обновить клуб (${res.status})`));
+}
+
+export async function presignClubAvatar(apiUrl: string, locale: string, id: string, contentType: string): Promise<PresignClubAvatarResponse> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/clubs/${id}/avatar/presign`, {
+    method: "POST",
+    credentials: "include",
+    headers: localeHeaders(locale, { "Content-Type": "application/json" }),
+    body: JSON.stringify({ contentType }),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Не удалось подготовить загрузку (${res.status})`));
+  return res.json();
+}
+
+export async function attachClubAvatar(apiUrl: string, locale: string, id: string, mediaId: string): Promise<void> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/clubs/${id}/avatar`, {
+    method: "POST",
+    credentials: "include",
+    headers: localeHeaders(locale, { "Content-Type": "application/json" }),
+    body: JSON.stringify({ mediaId }),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Не удалось сохранить логотип (${res.status})`));
 }
 
 export async function deleteClub(apiUrl: string, locale: string, id: string): Promise<void> {

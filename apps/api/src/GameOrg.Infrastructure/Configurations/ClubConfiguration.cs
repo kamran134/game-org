@@ -21,6 +21,7 @@ public sealed class ClubConfiguration : IEntityTypeConfiguration<Club>
         // EF только читает значение обратно после save, никогда не пишет его.
         builder.Property(e => e.SearchText).HasColumnType("text").ValueGeneratedOnAddOrUpdate();
         builder.Property(e => e.Visibility).HasConversion<string>().HasMaxLength(32);
+        builder.Property(e => e.Kind).HasConversion<string>().HasMaxLength(16);
         builder.Property(e => e.InviteCode).HasMaxLength(16);
 
         builder.HasIndex(e => e.TelegramChatId).IsUnique();

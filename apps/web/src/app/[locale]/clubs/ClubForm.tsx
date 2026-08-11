@@ -21,12 +21,16 @@ export function ClubForm({
   sports,
   mode,
   club,
+  kind = "Club",
 }: {
   apiUrl: string;
   cities: Option[];
   sports: Option[];
   mode: "create" | "edit";
   club?: ClubDetail;
+  // Неизменяем после создания — задаётся вызывающей страницей (/clubs/new
+  // против /groups/new), в edit-режиме берётся из club.kind и не показывается.
+  kind?: "Club" | "Group";
 }) {
   const t = useTranslations("Clubs");
   const locale = useLocale();
@@ -61,7 +65,7 @@ export function ClubForm({
     setSaving(true);
     setError(null);
     try {
-      const body: CreateClubRequest = { name, description, cityId: cityId || null, visibility, sportIds };
+      const body: CreateClubRequest = { name, description, cityId: cityId || null, visibility, kind, sportIds };
 
       if (mode === "create") {
         const created = await createClub(apiUrl, locale, body);

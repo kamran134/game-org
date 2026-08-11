@@ -21,6 +21,9 @@ public enum VenueStatus { Draft, Published, Hidden, Merged }
 
 public enum ClubVisibility { Public, RequestOnly, Private }
 
+/// <summary>Шаг 20 — группы не отдельная сущность, а вид клуба: та же роль/членство/заявки/инвайты.</summary>
+public enum ClubKind { Club, Group }
+
 public enum ClubRole { Owner, Admin, Member }
 
 public enum MembershipStatus { Pending, Active, Banned, Left }

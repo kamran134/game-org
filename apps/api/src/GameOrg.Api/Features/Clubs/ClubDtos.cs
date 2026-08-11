@@ -11,6 +11,8 @@ public sealed record ClubDto(
     string Name,
     CityDto? City,
     ClubVisibility Visibility,
+    ClubKind Kind,
+    string? AvatarUrl,
     int MembersCount,
     int EventsCount);
 
@@ -21,6 +23,8 @@ public sealed record ClubDetailDto(
     string? Description,
     CityDto? City,
     ClubVisibility Visibility,
+    ClubKind Kind,
+    string? AvatarUrl,
     int MembersCount,
     int EventsCount,
     Guid? CreatedById,
@@ -48,6 +52,8 @@ public sealed record CreateClubRequest(
     LocalizedTextDto? Description,
     Guid? CityId,
     ClubVisibility? Visibility,
+    // Неизменяем после создания (см. Club.Kind) — при create отсутствует в UpdateClubRequest намеренно.
+    ClubKind? Kind,
     List<Guid>? SportIds);
 
 /// <summary>Поле есть в теле и не null → применяется в PATCH; отсутствует/null → не трогается.</summary>
@@ -57,6 +63,11 @@ public sealed record UpdateClubRequest(
     Guid? CityId,
     ClubVisibility? Visibility,
     List<Guid>? SportIds);
+
+// Логотип — один MediaAsset на клуб (AvatarId), не галерея, как у Venue.Photos.
+public sealed record PresignClubAvatarRequest(string ContentType);
+public sealed record PresignClubAvatarResponse(Guid MediaId, string UploadUrl, string PublicUrl);
+public sealed record AttachClubAvatarRequest(Guid MediaId);
 
 public sealed record InviteMemberRequest(Guid UserId);
 

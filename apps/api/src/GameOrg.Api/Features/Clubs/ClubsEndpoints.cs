@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using GameOrg.Api.Common;
+using GameOrg.Domain;
 
 namespace GameOrg.Api.Features.Clubs;
 
@@ -9,10 +10,10 @@ public static class ClubsEndpoints
     public static IEndpointRouteBuilder MapClubsEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/clubs", async (
-            HttpContext ctx, ClaimsPrincipal principal, Guid? cityId, Guid? sportId, ClubService clubService, CancellationToken ct) =>
+            HttpContext ctx, ClaimsPrincipal principal, Guid? cityId, Guid? sportId, ClubKind? kind, ClubService clubService, CancellationToken ct) =>
         {
             var locale = RequestLocale.ResolveAndVary(ctx);
-            var clubs = await clubService.GetListAsync(locale, GetUserId(principal), cityId, sportId, ct);
+            var clubs = await clubService.GetListAsync(locale, GetUserId(principal), cityId, sportId, kind, ct);
             return Results.Ok(clubs);
         })
         .WithName("GetClubs")
@@ -87,6 +88,51 @@ public static class ClubsEndpoints
         .WithTags("Clubs")
         .RequireAuthorization()
         .Produces(StatusCodes.Status400BadRequest)
+        .Produces(StatusCodes.Status403Forbidden)
+        .Produces(StatusCodes.Status404NotFound);
+
+        app.MapPost("/api/clubs/{id:guid}/avatar/presign", async (
+            Guid id, PresignClubAvatarRequest request, ClaimsPrincipal principal, ClubService clubService, CancellationToken ct) =>
+        {
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            var (result, error) = await clubService.PresignAvatarAsync(id, userId.Value, request, ct);
+            if (error is not null)
+            {
+                var status = error.StartsWith("Загружать") ? StatusCodes.Status403Forbidden : StatusCodes.Status400BadRequest;
+                return Results.Problem(error, statusCode: status);
+            }
+
+            return Results.Ok(result);
+        })
+        .WithName("PresignClubAvatar")
+        .WithTags("Clubs")
+        .RequireAuthorization()
+        .Produces<PresignClubAvatarResponse>()
+        .Produces(StatusCodes.Status400BadRequest)
+        .Produces(StatusCodes.Status403Forbidden);
+
+        app.MapPost("/api/clubs/{id:guid}/avatar", async (
+            Guid id, AttachClubAvatarRequest request, ClaimsPrincipal principal, ClubService clubService, CancellationToken ct) =>
+        {
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            var (ok, error) = await clubService.SetAvatarAsync(id, userId.Value, request, ct);
+            if (!ok)
+            {
+                var status = error == "Клуб не найден." || error == "Медиа не найдено."
+                    ? StatusCodes.Status404NotFound
+                    : StatusCodes.Status403Forbidden;
+                return Results.Problem(error, statusCode: status);
+            }
+
+            return Results.NoContent();
+        })
+        .WithName("SetClubAvatar")
+        .WithTags("Clubs")
+        .RequireAuthorization()
         .Produces(StatusCodes.Status403Forbidden)
         .Produces(StatusCodes.Status404NotFound);
 

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { getClubAuthed, type ClubDetail } from "@/lib/clubsApi";
 import { ClubForm } from "../../ClubForm";
+import { ClubAvatarUploader } from "./ClubAvatarUploader";
 
 type Option = { id: string; name: string };
 
@@ -33,5 +34,10 @@ export function ClubEditView({
   if (!club) return <p className="text-foreground/70">{t("notFound")}</p>;
   if (club.viewerRole !== "Owner" && club.viewerRole !== "Admin") return <p className="text-red-600">{t("noAccessEdit")}</p>;
 
-  return <ClubForm apiUrl={apiUrl} cities={cities} sports={sports} mode="edit" club={club} />;
+  return (
+    <div className="flex flex-col gap-4">
+      <ClubAvatarUploader apiUrl={apiUrl} club={club} />
+      <ClubForm apiUrl={apiUrl} cities={cities} sports={sports} mode="edit" club={club} kind={club.kind} />
+    </div>
+  );
 }

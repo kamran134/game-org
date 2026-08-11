@@ -9,6 +9,8 @@ public sealed class Club
     public Guid? CityId { get; set; }
     public City? City { get; set; }
     public ClubVisibility Visibility { get; set; } = ClubVisibility.Public;
+    /// <summary>Неизменяем после создания — как SportId у Event. Group = ситуативный клуб, та же логика.</summary>
+    public ClubKind Kind { get; set; } = ClubKind.Club;
     /// <summary>chat_id Telegram-группы — связь с ботом. Null: клуб может жить без TG.</summary>
     public long? TelegramChatId { get; set; }
     public string? InviteCode { get; set; }
