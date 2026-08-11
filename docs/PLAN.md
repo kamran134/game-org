@@ -1676,6 +1676,116 @@ service worker)»). Выбор пользователя — Web Push, трети
   честный disclaimer, что был с R2/ботом в своё время: код готов, ждёт
   секретов и реального деплоя.
 
+### Шаг 18 — Оплата (офлайн: Cash/BankTransfer/Balance)
+
+Домен готов с Шага 2 (`Payment`, `PaymentStatus{Pending,Paid,Failed,Refunded,
+Cancelled}`, `PaymentMethod{Cash,BankTransfer,CardOnline,Balance}`,
+`Event.CostSplit/Cost/Currency`), кода нет вообще. Последний оставшийся
+кусок генплана — раньше стоял первым в очереди после Клубов (§3), но
+пользователь сознательно отложил его до выбора решения о провайдере
+(см. Шаг 12 — "деньги решили отложить").
+
+**Решение пользователя (вопрос в этой сессии):** строить только офлайн-
+методы (`Cash`/`BankTransfer`/`Balance`) — организатор вручную отмечает
+получение денег, без внешнего платёжного шлюза. `CardOnline` (реальная
+интеграция с epoint/payriff/stripe — комментарий в `Payment.cs` уже
+называет эти три варианта) — отдельный, не запланированный здесь шаг:
+нужен конкретный провайдер, merchant-ключи и проверка подписи webhook'ов,
+не то, что можно сделать без ручного шага пользователя.
+
+**Решения по умолчанию (не вопрос — прямое следствие уже существующих
+полей `Event.CostSplit`/`Cost`/`EventParticipant`/`Payment`):**
+
+- **Кому выставляется `Payment`** — только участникам с `UserId`
+  (гости — `PayerId` в домене обязателен, ставить не на кого, как и
+  везде в Reputation/Rating). Создаётся автоматически, когда участник
+  становится `Confirmed` (при записи или повышении из вейтлиста), и
+  только если `CostSplit != Free`.
+- **Сумма:** `CostSplit.PerPlayer` → `Payment.Amount = Event.Cost`
+  фиксированно на человека. `CostSplit.Total` → `Event.Cost /
+  ConfirmedCount`, округление до 2 знаков (`Math.Round`) — копейка
+  расхождения при делении на неровное число участников не решается
+  (нет смысла городить алгоритм честного дележа копеек ради MVP),
+  пересчитывается заново при каждом изменении состава (join/leave/
+  повышение), но **только для ещё не оплаченных** (`Pending`) записей —
+  уже полученные деньги задним числом не трогаем.
+- **Кто отменяет** — уход участника (`LeaveAsync`) переводит его
+  `Pending`-платёж в `Cancelled` (не удаляет — для истории). Отмена
+  события (`CancelAsync`) переводит в `Cancelled` все `Pending`-платежи
+  события разом. Уже оплаченные (`Paid`) — не трогаются автоматически,
+  возврат — ручное действие организатора (перевести статус в `Refunded`
+  через тот же эндпоинт, что и подтверждение оплаты).
+- **Кто подтверждает оплату** — только создатель события или модератор
+  (тот же уровень доступа, что запись результата/явки, Шаг 14) — прямым
+  действием "отметить оплаченным", без встречного самостоятельного
+  репорта от участника ("я перевёл, подтвердите") — тот же принцип
+  простоты, что и явка на Шаге 14 (организатор ставит галочку по факту).
+- **`NotificationType.PaymentDue`/`PaymentConfirmed`** — первые реальные
+  вызовы (числились в enum'е под этот шаг с Шага 11). `PaymentDue`
+  шлётся сразу при создании `Payment` (не отдельным Hangfire-джобом-
+  напоминанием по расписанию, как `EventReminder24h/2h`, — за пределами
+  объёма, можно добавить отдельным заходом позже).
+- **Метод по умолчанию** — `Cash` при создании (организатор ещё не знает,
+  как заплатят), меняется на реальный при подтверждении.
+- **Видимость** — список платежей события целиком видит только
+  создатель/модератор (финансовые данные чужих людей). Участнику в
+  `EventDetailDto` встраивается только его собственный платёж
+  (`MyPayment`), как `MyMvpVote` на Шаге 14.
+
+#### Фаза 18.1 — Backend: создание, пересчёт, отмена
+
+- `Features/Payments/PaymentService.cs`: `EnsurePaymentAsync(eventId,
+  participantId, ct)` (создаёт `Pending`, шлёт `PaymentDue`),
+  `RecomputeTotalSplitAsync(eventId, ct)` (только `CostSplit.Total`,
+  только `Pending`), `CancelPendingForParticipantAsync(participantId, ct)`,
+  `CancelAllPendingForEventAsync(eventId, ct)`.
+- `EventService.JoinAsync`/`PromoteFromWaitlistAsync` — после
+  `RecomputeCountsAsync`, если участник стал `Confirmed`:
+  `EnsurePaymentAsync` + `RecomputeTotalSplitAsync`.
+- `EventService.LeaveAsync` — `CancelPendingForParticipantAsync` +
+  `RecomputeTotalSplitAsync` после пересчёта состава.
+- `EventService.CancelAsync` — `CancelAllPendingForEventAsync`.
+- `Program.cs`: `AddScoped<PaymentService>()`, внедрить в `EventService`.
+
+#### Фаза 18.2 — Backend: список организатора и подтверждение
+
+- `Features/Payments/PaymentDtos.cs`: `PaymentDto`, `PaymentSummaryDto`,
+  `UpdatePaymentStatusRequest(PaymentStatus Status, PaymentMethod? Method,
+  string? Note)`.
+- `PaymentService.GetForEventAsync(eventId, viewerId, isModerator, locale, ct)`
+  — 403/404 через `(Result, Error)` (как везде), `SetStatusAsync(paymentId,
+  actorId, isModerator, request, ct)` — на `Paid` шлёт `PaymentConfirmed`.
+- `Features/Payments/PaymentsEndpoints.cs`: `GET
+  /api/events/{id:guid}/payments`, `PATCH /api/payments/{id:guid}`, оба
+  `.RequireAuthorization()`.
+- `NotificationService.WiredTypes` — добавить `PaymentDue`/`PaymentConfirmed`.
+
+#### Фаза 18.3 — Backend: мои платежи
+
+- `PaymentService.GetMyPaymentsAsync(userId, locale, ct)`,
+  `GetMyPaymentForEventAsync(eventId, userId, ct)`.
+- `GET /api/me/payments`.
+- `EventDetailDto` — добавить `MyPayment: PaymentSummaryDto?`,
+  `EventService.GetByPublicIdAsync` подтягивает его для `viewerId`.
+
+#### Фаза 18.4 — Frontend
+
+- `paymentsApi.ts` — типы, `getEventPayments`, `updatePaymentStatus`,
+  `getMyPayments`.
+- `PaymentsSection.tsx` на странице события (только создатель/модератор)
+  — список участников с суммой/статусом, кнопки
+  Paid/Refunded/Cancelled + выбор метода + заметка.
+- Банер «Вы должны X» на странице события для участника с `MyPayment`.
+- `/me/payments` (новый маршрут) — все платежи/долги пользователя по
+  всем событиям.
+- i18n: `Payments.*`.
+
+#### Фаза 18.5 — Сборка и проверка
+
+- `dotnet build`/`dotnet test`, `pnpm --filter web run build`, `pnpm run
+  lint`.
+- В браузере не проверялось — тот же disclaimer, что в Шагах 13-17.
+
 ---
 
 ## 9. Конвенции
