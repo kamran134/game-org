@@ -22,7 +22,8 @@ public static class ProfileEndpoints
             var locale = RequestLocale.ResolveAndVary(ctx);
             var followersCount = await followService.CountFollowersAsync(FollowTargetType.User, user.Id, ct);
             var followingCount = await followService.CountFollowingAsync(user.Id, ct);
-            return Results.Ok(MapMe(user, locale, followersCount, followingCount));
+            var (ratings, reliabilityScore) = await GetReputationAsync(db, user.Id, ct);
+            return Results.Ok(MapMe(user, locale, followersCount, followingCount, reliabilityScore, ratings));
         })
         .WithName("Me")
         .WithTags("Profiles")
@@ -52,7 +53,8 @@ public static class ProfileEndpoints
             var locale = RequestLocale.Resolve(ctx.Request.Headers.AcceptLanguage.ToString());
             var followersCount = await followService.CountFollowersAsync(FollowTargetType.User, user.Id, ct);
             var followingCount = await followService.CountFollowingAsync(user.Id, ct);
-            return Results.Ok(MapMe(user, locale, followersCount, followingCount));
+            var (ratings, reliabilityScore) = await GetReputationAsync(db, user.Id, ct);
+            return Results.Ok(MapMe(user, locale, followersCount, followingCount, reliabilityScore, ratings));
         })
         .WithName("UpdateMe")
         .WithTags("Profiles")
@@ -66,15 +68,17 @@ public static class ProfileEndpoints
             UpsertUserSportRequest request,
             ClaimsPrincipal principal,
             ProfileService profileService,
+            GameOrgDbContext db,
             CancellationToken ct) =>
         {
             var userId = GetUserId(principal);
             if (userId is null) return Results.Unauthorized();
 
             var (userSport, error) = await profileService.UpsertSportAsync(userId.Value, sportId, request, ct);
-            return error is not null
-                ? Results.Problem(error, statusCode: StatusCodes.Status400BadRequest)
-                : Results.Ok(MapUserSport(userSport!));
+            if (error is not null) return Results.Problem(error, statusCode: StatusCodes.Status400BadRequest);
+
+            var (ratings, _) = await GetReputationAsync(db, userId.Value, ct);
+            return Results.Ok(MapUserSport(userSport!, ratings));
         })
         .WithName("UpsertMySport")
         .WithTags("Profiles")
@@ -116,7 +120,8 @@ public static class ProfileEndpoints
             var locale = RequestLocale.ResolveAndVary(ctx);
             var followersCount = await followService.CountFollowersAsync(FollowTargetType.User, user.Id, ct);
             var viewerIsFollowing = await followService.IsFollowingAsync(GetUserId(principal), FollowTargetType.User, user.Id, ct);
-            return Results.Ok(MapPublic(user, locale, followersCount, viewerIsFollowing));
+            var (ratings, reliabilityScore) = await GetReputationAsync(db, user.Id, ct);
+            return Results.Ok(MapPublic(user, locale, followersCount, viewerIsFollowing, reliabilityScore, ratings));
         })
         .WithName("GetPublicProfile")
         .WithTags("Profiles")
@@ -144,36 +149,54 @@ public static class ProfileEndpoints
             .FirstOrDefaultAsync(u => u.Id == userId && u.DeletedAt == null, ct);
     }
 
-    private static MeProfileDto MapMe(User user, string locale, int followersCount, int followingCount) => new(
+    /// <summary>SportRating по каждому виду спорта пользователя + ReliabilityStat.Score (100 — нет истории).</summary>
+    private static async Task<(Dictionary<Guid, SportRating> Ratings, int ReliabilityScore)> GetReputationAsync(GameOrgDbContext db, Guid userId, CancellationToken ct)
+    {
+        var ratings = await db.SportRatings.Where(r => r.UserId == userId).ToDictionaryAsync(r => r.SportId, ct);
+        var score = await db.ReliabilityStats.Where(s => s.UserId == userId).Select(s => (int?)s.Score).FirstOrDefaultAsync(ct) ?? 100;
+        return (ratings, score);
+    }
+
+    private static MeProfileDto MapMe(User user, string locale, int followersCount, int followingCount, int reliabilityScore, Dictionary<Guid, SportRating> ratings) => new(
         user.Id, user.Handle,
         Localized.Resolve(user.DisplayNameI18n, locale) ?? "",
         Localized.Resolve(user.BioI18n, locale),
         user.BirthDate, user.Gender, user.Phone,
         user.Locale, user.Timezone, user.ProfileVisibility, MapCity(user.City), user.AvatarId, user.IsVerified,
         user.Role,
-        user.Sports.Select(MapUserSport).ToList(),
-        followersCount, followingCount,
+        user.Sports.Select(s => MapUserSport(s, ratings)).ToList(),
+        followersCount, followingCount, reliabilityScore,
         LocalizedTextDto.From(user.DisplayNameI18n),
         LocalizedTextDto.FromNullable(user.BioI18n));
 
-    private static PublicProfileDto MapPublic(User user, string locale, int followersCount, bool viewerIsFollowing) => new(
+    private static PublicProfileDto MapPublic(User user, string locale, int followersCount, bool viewerIsFollowing, int reliabilityScore, Dictionary<Guid, SportRating> ratings) => new(
         user.Id,
         user.Handle,
         Localized.Resolve(user.DisplayNameI18n, locale) ?? "",
         Localized.Resolve(user.BioI18n, locale),
         MapCity(user.City), user.AvatarId, user.IsVerified,
-        user.Sports.Where(s => s.Visibility == Visibility.Public).Select(MapPublicUserSport).ToList(),
-        followersCount, viewerIsFollowing);
+        user.Sports.Where(s => s.Visibility == Visibility.Public).Select(s => MapPublicUserSport(s, ratings)).ToList(),
+        followersCount, viewerIsFollowing, reliabilityScore);
 
     private static CityDto? MapCity(City? city) => city is null ? null : new CityDto(city.Id, city.Slug, city.NameI18n, city.Lat, city.Lng);
 
-    private static UserSportDto MapUserSport(UserSport s) => new(
-        s.SportId, s.Sport.Slug, s.Sport.Emoji, s.Level, s.IsPrimary, s.PlayingSince, s.Footedness,
-        s.HeightCm, s.JerseyNumber, s.Note, s.Visibility, MapPositions(s));
+    private static UserSportDto MapUserSport(UserSport s, Dictionary<Guid, SportRating> ratings)
+    {
+        ratings.TryGetValue(s.SportId, out var r);
+        return new UserSportDto(
+            s.SportId, s.Sport.Slug, s.Sport.Emoji, s.Level, s.IsPrimary, s.PlayingSince, s.Footedness,
+            s.HeightCm, s.JerseyNumber, s.Note, s.Visibility, MapPositions(s),
+            r?.Rating ?? 1500, r?.GamesPlayed ?? 0, r?.Wins ?? 0, r?.Draws ?? 0, r?.Losses ?? 0);
+    }
 
-    private static PublicUserSportDto MapPublicUserSport(UserSport s) => new(
-        s.Sport.Slug, s.Sport.Emoji, s.Level, s.IsPrimary, s.PlayingSince, s.Footedness,
-        s.HeightCm, s.JerseyNumber, MapPositions(s));
+    private static PublicUserSportDto MapPublicUserSport(UserSport s, Dictionary<Guid, SportRating> ratings)
+    {
+        ratings.TryGetValue(s.SportId, out var r);
+        return new PublicUserSportDto(
+            s.Sport.Slug, s.Sport.Emoji, s.Level, s.IsPrimary, s.PlayingSince, s.Footedness,
+            s.HeightCm, s.JerseyNumber, MapPositions(s),
+            r?.Rating ?? 1500, r?.GamesPlayed ?? 0, r?.Wins ?? 0, r?.Draws ?? 0, r?.Losses ?? 0);
+    }
 
     private static List<UserSportPositionDto> MapPositions(UserSport s) =>
         s.Positions.Select(p => new UserSportPositionDto(p.PositionId, p.Position.Code, p.IsPrimary)).ToList();

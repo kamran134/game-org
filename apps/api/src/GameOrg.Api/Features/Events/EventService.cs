@@ -1,6 +1,7 @@
 using GameOrg.Api.Common;
 using GameOrg.Api.Features.Clubs;
 using GameOrg.Api.Features.Moderation;
+using GameOrg.Api.Features.Reputation;
 using GameOrg.Api.Features.Social;
 using GameOrg.Api.Features.Sports;
 using GameOrg.Domain;
@@ -13,7 +14,12 @@ namespace GameOrg.Api.Features.Events;
 
 /// <summary>CRUD событий, запись участников (с вейтлистом), отмена. Напоминания за 24ч/2ч — EventReminderJob.</summary>
 public sealed class EventService(
-    GameOrgDbContext db, NotificationSender notificationSender, AuditLogService auditLog, ClubService clubService, ActivityService activityService)
+    GameOrgDbContext db,
+    NotificationSender notificationSender,
+    AuditLogService auditLog,
+    ClubService clubService,
+    ActivityService activityService,
+    RatingService ratingService)
 {
     public async Task<(Event? Result, string? Error)> CreateAsync(Guid userId, CreateEventRequest request, CancellationToken ct)
     {
@@ -351,6 +357,7 @@ public sealed class EventService(
             result = new EventResult { EventId = eventId };
             db.EventResults.Add(result);
         }
+        var alreadyRated = result.RatingsApplied;
 
         result.Summary = request.Summary;
         result.Standings = request.Standings?.Select(s =>
@@ -364,6 +371,11 @@ public sealed class EventService(
         result.RecordedAt = DateTime.UtcNow;
 
         await db.SaveChangesAsync(ct);
+
+        // Только один раз на событие — правка результата задним числом рейтинг не трогает
+        // (EventResult.RatingsApplied — идемпотентность, см. docs/PLAN.md, Шаг 15).
+        if (!alreadyRated)
+            await ratingService.ApplyResultAsync(eventId, request.Standings, ct);
 
         var participantUserIds = await db.EventParticipants
             .Where(p => p.EventId == eventId && p.UserId != null)

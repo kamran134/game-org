@@ -18,7 +18,13 @@ public sealed record UserSportDto(
     int? JerseyNumber,
     string? Note,
     Visibility Visibility,
-    List<UserSportPositionDto> Positions);
+    List<UserSportPositionDto> Positions,
+    // Glicko-2 (Шаг 15) — 1500/0/0/0/0, пока нет ни одной засчитанной игры (SportRating ещё не создан).
+    double Rating,
+    int GamesPlayed,
+    int Wins,
+    int Draws,
+    int Losses);
 
 public sealed record MeProfileDto(
     Guid Id,
@@ -38,6 +44,7 @@ public sealed record MeProfileDto(
     List<UserSportDto> Sports,
     int FollowersCount,
     int FollowingCount,
+    int ReliabilityScore,
     // Резолвнутые DisplayName/Bio выше — для отображения. Эти два — сырые
     // словари по всем языкам, нужны только форме редактирования (/me).
     LocalizedTextDto DisplayNameI18n,
@@ -52,7 +59,12 @@ public sealed record PublicUserSportDto(
     Footedness? Footedness,
     int? HeightCm,
     int? JerseyNumber,
-    List<UserSportPositionDto> Positions);
+    List<UserSportPositionDto> Positions,
+    double Rating,
+    int GamesPlayed,
+    int Wins,
+    int Draws,
+    int Losses);
 
 /// <summary>
 /// Id добавлен для Шага 10 (жалоба на пользователя нужен TargetId) — идёт через Kiota,
@@ -70,7 +82,8 @@ public sealed record PublicProfileDto(
     bool IsVerified,
     List<PublicUserSportDto> Sports,
     int FollowersCount,
-    bool ViewerIsFollowing);
+    bool ViewerIsFollowing,
+    int ReliabilityScore);
 
 /// <summary>
 /// Поле есть в теле и не null → применяется. Поле отсутствует/null → не

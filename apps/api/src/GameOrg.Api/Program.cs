@@ -9,6 +9,7 @@ using GameOrg.Api.Features.Identity;
 using GameOrg.Api.Features.Moderation;
 using GameOrg.Api.Features.Notifications;
 using GameOrg.Api.Features.Profiles;
+using GameOrg.Api.Features.Reputation;
 using GameOrg.Api.Features.Social;
 using GameOrg.Api.Features.Sports;
 using GameOrg.Api.Features.Venues;
@@ -89,6 +90,7 @@ builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<ClubService>();
 builder.Services.AddScoped<FollowService>();
 builder.Services.AddScoped<ActivityService>();
+builder.Services.AddScoped<RatingService>();
 
 builder.Services.AddHttpClient<TelegramSender>();
 builder.Services.AddScoped<NotificationSender>();
@@ -215,6 +217,7 @@ app.MapModerationEndpoints();
 app.MapNotificationsEndpoints();
 app.MapClubsEndpoints();
 app.MapSocialEndpoints();
+app.MapReputationEndpoints();
 
 app.Run();
 
