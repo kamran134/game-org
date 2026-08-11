@@ -1,15 +1,17 @@
+using System.Security.Cryptography;
 using GameOrg.Api.Common;
 using GameOrg.Api.Features.Geography;
 using GameOrg.Api.Features.Sports;
 using GameOrg.Domain;
 using GameOrg.Domain.Entities;
 using GameOrg.Infrastructure;
+using GameOrg.Infrastructure.Notifications;
 using Microsoft.EntityFrameworkCore;
 
 namespace GameOrg.Api.Features.Clubs;
 
 /// <summary>CRUD клубов и управление участниками.</summary>
-public sealed class ClubService(GameOrgDbContext db)
+public sealed class ClubService(GameOrgDbContext db, NotificationSender notificationSender)
 {
     public async Task<(Club? Result, string? Error)> CreateAsync(Guid userId, CreateClubRequest request, CancellationToken ct)
     {
@@ -138,6 +140,276 @@ public sealed class ClubService(GameOrgDbContext db)
         club.DeletedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
         return (true, null);
+    }
+
+    /// <summary>Public — сразу Active; RequestOnly — Pending, ждёт Owner/Admin; Private — вообще не отсюда (только InviteAsync).</summary>
+    public async Task<(bool Ok, string? Error)> JoinAsync(Guid clubId, Guid userId, CancellationToken ct)
+    {
+        var club = await db.Clubs.FirstOrDefaultAsync(c => c.Id == clubId, ct);
+        if (club is null) return (false, "Клуб не найден.");
+        if (club.Visibility == ClubVisibility.Private) return (false, "В этот клуб можно попасть только по приглашению.");
+
+        var existing = await db.ClubMembers.FirstOrDefaultAsync(m => m.ClubId == clubId && m.UserId == userId, ct);
+        if (existing is { Status: MembershipStatus.Active }) return (false, "Вы уже участник этого клуба.");
+        if (existing is { Status: MembershipStatus.Pending }) return (false, "Заявка уже отправлена, ждите одобрения.");
+        if (existing is { Status: MembershipStatus.Banned }) return (false, "Вы забанены в этом клубе.");
+
+        var status = club.Visibility == ClubVisibility.Public ? MembershipStatus.Active : MembershipStatus.Pending;
+
+        if (existing is null)
+        {
+            db.ClubMembers.Add(new ClubMember { ClubId = clubId, UserId = userId, Status = status });
+        }
+        else
+        {
+            // Left ранее — разрешаем повторное вступление, сбрасываем статус.
+            existing.Status = status;
+            existing.Role = ClubRole.Member;
+            existing.JoinedAt = DateTime.UtcNow;
+            existing.LeftAt = null;
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        if (status == MembershipStatus.Active)
+        {
+            await RecomputeMembersCountAsync(clubId, ct);
+        }
+        else
+        {
+            var managerIds = await db.ClubMembers
+                .Where(m => m.ClubId == clubId && m.Status == MembershipStatus.Active && (m.Role == ClubRole.Owner || m.Role == ClubRole.Admin))
+                .Select(m => m.UserId)
+                .ToListAsync(ct);
+
+            foreach (var managerId in managerIds)
+            {
+                await notificationSender.SendAsync(
+                    managerId, NotificationType.ClubJoinRequest,
+                    $"CLUB_JOIN_REQUEST:{clubId}:{userId}:{DateTime.UtcNow.Ticks}",
+                    "Новая заявка на вступление в клуб.",
+                    new Dictionary<string, object> { ["clubId"] = clubId.ToString() }, ct);
+            }
+        }
+
+        return (true, null);
+    }
+
+    public async Task<(bool Ok, string? Error)> LeaveAsync(Guid clubId, Guid userId, CancellationToken ct)
+    {
+        var member = await db.ClubMembers.FirstOrDefaultAsync(m => m.ClubId == clubId && m.UserId == userId && m.Status == MembershipStatus.Active, ct);
+        if (member is null) return (false, "Вы не участник этого клуба.");
+        if (member.Role == ClubRole.Owner) return (false, "Владелец сначала должен передать права другому участнику.");
+
+        member.Status = MembershipStatus.Left;
+        member.LeftAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        await RecomputeMembersCountAsync(clubId, ct);
+        return (true, null);
+    }
+
+    /// <summary>Owner/Admin добавляет конкретного пользователя сразу как Active — единственный путь в Private-клуб.</summary>
+    public async Task<(bool Ok, string? Error)> InviteAsync(Guid clubId, Guid actorId, Guid targetUserId, CancellationToken ct)
+    {
+        if (!await IsOwnerOrAdminAsync(clubId, actorId, ct)) return (false, "Приглашать может только владелец или админ клуба.");
+
+        var existing = await db.ClubMembers.FirstOrDefaultAsync(m => m.ClubId == clubId && m.UserId == targetUserId, ct);
+        if (existing is { Status: MembershipStatus.Active }) return (false, "Пользователь уже в клубе.");
+
+        if (existing is null)
+        {
+            db.ClubMembers.Add(new ClubMember { ClubId = clubId, UserId = targetUserId, Status = MembershipStatus.Active, InvitedById = actorId });
+        }
+        else
+        {
+            // Приглашение снимает и Banned — явное решение админа перевешивает прошлый бан.
+            existing.Status = MembershipStatus.Active;
+            existing.Role = ClubRole.Member;
+            existing.InvitedById = actorId;
+            existing.JoinedAt = DateTime.UtcNow;
+            existing.LeftAt = null;
+        }
+
+        await db.SaveChangesAsync(ct);
+        await RecomputeMembersCountAsync(clubId, ct);
+        await notificationSender.SendAsync(
+            targetUserId, NotificationType.ClubInvite,
+            $"CLUB_INVITE:{clubId}:{targetUserId}:{DateTime.UtcNow.Ticks}",
+            "Вас добавили в клуб.",
+            new Dictionary<string, object> { ["clubId"] = clubId.ToString() }, ct);
+        return (true, null);
+    }
+
+    public async Task<(bool Ok, string? Error)> ApproveJoinRequestAsync(Guid clubId, Guid actorId, Guid targetUserId, CancellationToken ct)
+    {
+        if (!await IsOwnerOrAdminAsync(clubId, actorId, ct)) return (false, "Одобрять заявки может только владелец или админ клуба.");
+
+        var member = await db.ClubMembers.FirstOrDefaultAsync(m => m.ClubId == clubId && m.UserId == targetUserId && m.Status == MembershipStatus.Pending, ct);
+        if (member is null) return (false, "Заявка не найдена.");
+
+        member.Status = MembershipStatus.Active;
+        member.JoinedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        await RecomputeMembersCountAsync(clubId, ct);
+        return (true, null);
+    }
+
+    /// <summary>Удаляет саму заявку (не Rejected-статус — его нет в MembershipStatus), можно попробовать вступить снова.</summary>
+    public async Task<(bool Ok, string? Error)> RejectJoinRequestAsync(Guid clubId, Guid actorId, Guid targetUserId, CancellationToken ct)
+    {
+        if (!await IsOwnerOrAdminAsync(clubId, actorId, ct)) return (false, "Отклонять заявки может только владелец или админ клуба.");
+
+        var member = await db.ClubMembers.FirstOrDefaultAsync(m => m.ClubId == clubId && m.UserId == targetUserId && m.Status == MembershipStatus.Pending, ct);
+        if (member is null) return (false, "Заявка не найдена.");
+
+        db.ClubMembers.Remove(member);
+        await db.SaveChangesAsync(ct);
+        return (true, null);
+    }
+
+    /// <summary>Owner/Admin — Owner'а удалить нельзя (сначала передать владение), Admin'а — только Owner.</summary>
+    public async Task<(bool Ok, string? Error)> RemoveMemberAsync(Guid clubId, Guid actorId, Guid targetUserId, CancellationToken ct)
+    {
+        var actorMembership = await db.ClubMembers.FirstOrDefaultAsync(m => m.ClubId == clubId && m.UserId == actorId, ct);
+        if (actorMembership is not { Status: MembershipStatus.Active } || actorMembership.Role is not (ClubRole.Owner or ClubRole.Admin))
+            return (false, "Удалять участников может только владелец или админ клуба.");
+
+        var target = await db.ClubMembers.FirstOrDefaultAsync(m => m.ClubId == clubId && m.UserId == targetUserId && m.Status == MembershipStatus.Active, ct);
+        if (target is null) return (false, "Участник не найден.");
+        if (target.Role == ClubRole.Owner) return (false, "Владельца удалить нельзя.");
+        if (target.Role == ClubRole.Admin && actorMembership.Role != ClubRole.Owner) return (false, "Админа может удалить только владелец.");
+
+        target.Status = MembershipStatus.Banned;
+        target.LeftAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        await RecomputeMembersCountAsync(clubId, ct);
+        return (true, null);
+    }
+
+    /// <summary>Только Owner назначает/снимает Admin. Роль Owner передаётся отдельно — TransferOwnershipAsync.</summary>
+    public async Task<(bool Ok, string? Error)> SetRoleAsync(Guid clubId, Guid actorId, Guid targetUserId, ClubRole role, CancellationToken ct)
+    {
+        if (role == ClubRole.Owner) return (false, "Владение передаётся отдельным действием.");
+
+        var actorMembership = await db.ClubMembers.FirstOrDefaultAsync(m => m.ClubId == clubId && m.UserId == actorId, ct);
+        if (actorMembership is not { Status: MembershipStatus.Active, Role: ClubRole.Owner })
+            return (false, "Назначать роли может только владелец клуба.");
+
+        var target = await db.ClubMembers.FirstOrDefaultAsync(m => m.ClubId == clubId && m.UserId == targetUserId && m.Status == MembershipStatus.Active, ct);
+        if (target is null) return (false, "Участник не найден.");
+        if (target.Role == ClubRole.Owner) return (false, "Роль владельца можно только передать целиком.");
+
+        target.Role = role;
+        await db.SaveChangesAsync(ct);
+        return (true, null);
+    }
+
+    /// <summary>
+    /// Два отдельных SaveChangesAsync, не один — club_members_owner_uq (partial unique
+    /// WHERE role='OWNER' AND status='ACTIVE') не даст на секунду оказаться двум активным
+    /// Owner одновременно, если бы EF применил апдейты в "неправильном" порядке за один раз.
+    /// </summary>
+    public async Task<(bool Ok, string? Error)> TransferOwnershipAsync(Guid clubId, Guid actorId, Guid targetUserId, CancellationToken ct)
+    {
+        var actorMembership = await db.ClubMembers.FirstOrDefaultAsync(m => m.ClubId == clubId && m.UserId == actorId, ct);
+        if (actorMembership is not { Status: MembershipStatus.Active, Role: ClubRole.Owner })
+            return (false, "Передать владение может только текущий владелец.");
+        if (targetUserId == actorId) return (false, "Вы уже владелец.");
+
+        var target = await db.ClubMembers.FirstOrDefaultAsync(m => m.ClubId == clubId && m.UserId == targetUserId && m.Status == MembershipStatus.Active, ct);
+        if (target is null) return (false, "Участник не найден.");
+
+        actorMembership.Role = ClubRole.Admin;
+        await db.SaveChangesAsync(ct);
+
+        target.Role = ClubRole.Owner;
+        await db.SaveChangesAsync(ct);
+        return (true, null);
+    }
+
+    public async Task<(List<ClubMemberDto>? Result, string? Error)> GetMembersAsync(Guid clubId, Guid viewerId, string locale, CancellationToken ct)
+    {
+        var viewerMembership = await db.ClubMembers.FirstOrDefaultAsync(m => m.ClubId == clubId && m.UserId == viewerId, ct);
+        if (viewerMembership is not { Status: MembershipStatus.Active }) return (null, "Список участников виден только участникам клуба.");
+
+        var members = await db.ClubMembers
+            .Where(m => m.ClubId == clubId && m.Status == MembershipStatus.Active)
+            .Include(m => m.User)
+            .OrderBy(m => m.Role).ThenBy(m => m.JoinedAt)
+            .ToListAsync(ct);
+
+        return (members.Select(m => new ClubMemberDto(
+            m.UserId, Localized.Resolve(m.User.DisplayNameI18n, locale) ?? m.User.Handle, m.Role, m.Status, m.JoinedAt)).ToList(), null);
+    }
+
+    public async Task<(List<ClubMemberDto>? Result, string? Error)> GetJoinRequestsAsync(Guid clubId, Guid viewerId, string locale, CancellationToken ct)
+    {
+        if (!await IsOwnerOrAdminAsync(clubId, viewerId, ct)) return (null, "Заявки видит только владелец или админ клуба.");
+
+        var pending = await db.ClubMembers
+            .Where(m => m.ClubId == clubId && m.Status == MembershipStatus.Pending)
+            .Include(m => m.User)
+            .OrderBy(m => m.JoinedAt)
+            .ToListAsync(ct);
+
+        return (pending.Select(m => new ClubMemberDto(
+            m.UserId, Localized.Resolve(m.User.DisplayNameI18n, locale) ?? m.User.Handle, m.Role, m.Status, m.JoinedAt)).ToList(), null);
+    }
+
+    /// <summary>Обходит маршрутизацию по Visibility — код сам по себе уже "приглашение", единственный путь в Private без InviteAsync.</summary>
+    public async Task<(Club? Result, string? Error)> JoinByInviteCodeAsync(string inviteCode, Guid userId, CancellationToken ct)
+    {
+        var club = await db.Clubs.FirstOrDefaultAsync(c => c.InviteCode == inviteCode, ct);
+        if (club is null) return (null, "Код приглашения не найден.");
+
+        var existing = await db.ClubMembers.FirstOrDefaultAsync(m => m.ClubId == club.Id && m.UserId == userId, ct);
+        if (existing is { Status: MembershipStatus.Active }) return (club, null);
+        if (existing is { Status: MembershipStatus.Banned }) return (null, "Вы забанены в этом клубе.");
+
+        if (existing is null)
+        {
+            db.ClubMembers.Add(new ClubMember { ClubId = club.Id, UserId = userId, Status = MembershipStatus.Active });
+        }
+        else
+        {
+            existing.Status = MembershipStatus.Active;
+            existing.Role = ClubRole.Member;
+            existing.JoinedAt = DateTime.UtcNow;
+            existing.LeftAt = null;
+        }
+
+        await db.SaveChangesAsync(ct);
+        await RecomputeMembersCountAsync(club.Id, ct);
+        return (club, null);
+    }
+
+    public async Task<(string? Code, string? Error)> RegenerateInviteCodeAsync(Guid clubId, Guid actorId, CancellationToken ct)
+    {
+        if (!await IsOwnerOrAdminAsync(clubId, actorId, ct)) return (null, "Код может обновить только владелец или админ клуба.");
+
+        var club = await db.Clubs.FirstOrDefaultAsync(c => c.Id == clubId, ct);
+        if (club is null) return (null, "Клуб не найден.");
+
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            var candidate = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(6));
+            if (await db.Clubs.AnyAsync(c => c.InviteCode == candidate, ct)) continue;
+
+            club.InviteCode = candidate;
+            await db.SaveChangesAsync(ct);
+            return (candidate, null);
+        }
+
+        throw new InvalidOperationException("Не удалось сгенерировать уникальный код приглашения после 5 попыток.");
+    }
+
+    private async Task RecomputeMembersCountAsync(Guid clubId, CancellationToken ct)
+    {
+        var club = await db.Clubs.FirstOrDefaultAsync(c => c.Id == clubId, ct);
+        if (club is null) return;
+
+        club.MembersCount = await db.ClubMembers.CountAsync(m => m.ClubId == clubId && m.Status == MembershipStatus.Active, ct);
+        await db.SaveChangesAsync(ct);
     }
 
     internal async Task<bool> IsOwnerOrAdminAsync(Guid clubId, Guid userId, CancellationToken ct)

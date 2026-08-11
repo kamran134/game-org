@@ -45,10 +45,11 @@ public sealed class NotificationService(GameOrgDbContext db)
     }
 
     /// <summary>
-    /// Только реально вызываемые типы — остальные (ClubInvite, NewFollower, MvpVoteOpen...) числятся
-    /// в enum'е под ещё не построенные фичи (Clubs/Follow/MvpVote/Payment), показывать для них
+    /// Только реально вызываемые типы — остальные (NewFollower, MvpVoteOpen...) числятся
+    /// в enum'е под ещё не построенные фичи (Follow/MvpVote/Payment), показывать для них
     /// переключатель было бы мёртвым UI. Список расширять по мере того, как эти типы начинают
-    /// реально отправляться в NotificationSender.SendAsync.
+    /// реально отправляться в NotificationSender.SendAsync. ClubInvite/ClubJoinRequest добавлены
+    /// в Шаге 12 — первые реальные вызовы этих двух типов, см. ClubService.
     /// </summary>
     private static readonly NotificationType[] WiredTypes =
     [
@@ -60,6 +61,8 @@ public sealed class NotificationService(GameOrgDbContext db)
         NotificationType.ParticipantJoined,
         NotificationType.ParticipantLeft,
         NotificationType.WaitlistPromoted,
+        NotificationType.ClubInvite,
+        NotificationType.ClubJoinRequest,
     ];
 
     /// <summary>Opt-out: строки нет → включено. Один и тот же принцип, что в NotificationSender.IsChannelEnabledAsync.</summary>
