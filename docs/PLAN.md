@@ -972,6 +972,116 @@ Channel)` unique в БД никем не используется — `Notificat
 
 ---
 
+### Шаг 12 — Клубы (приватные группы)
+
+Домен готов с Шага 2 (`Club`, `ClubSport`, `ClubMember`,
+`ClubVisibility{Public,RequestOnly,Private}`, `ClubRole{Owner,Admin,Member}`,
+`MembershipStatus{Pending,Active,Banned,Left}`), кода нет вообще. Взято по
+списку модулей §3 (`Clubs` — первый из оставшихся: `Clubs → Payments →
+Social → Reputation`).
+
+**Решения приняты пользователем (не пересматривать):**
+
+| Вопрос | Решение |
+|---|---|
+| `Club.Name`/`Description` | Перевести в i18n (`NameI18n`/`DescriptionI18n`), как `Venue`/`Event`/`User` |
+| Интеграция с событиями | Включена: выбор клуба в форме события, `EventVisibility.Club` видна только участникам |
+| Кто создаёт клуб | Любой залогиненный (как площадки, Шаг 7) — создатель становится `Owner` |
+| `TelegramChatId` | Вне охвата — поле остаётся `null`, флоу привязки TG-группы не строим (не трогаем `game-organization-bot`) |
+
+**Вступление — по `ClubVisibility`, не вопрос, а прямое следствие названий
+enum'а:**
+- `Public` — вступление сразу `Active`.
+- `RequestOnly` — заявка создаёт `Pending`, `Owner`/`Admin` одобряет/отклоняет.
+- `Private` — только приглашение `Owner`/`Admin`, самостоятельного запроса
+  нет вообще; клуб не показывается в общем каталоге не-участникам (как
+  `VenueStatus.Draft` в Шаге 9.2 — те же `viewerId`-aware правила чтения).
+
+Один активный `Owner` на клуб — уже гарантировано partial-unique индексом
+`club_members_owner_uq` в `001_constraints.sql`, ничего добавлять не нужно.
+
+#### Фаза 12.1 — Домен: i18n для `Club` + миграция
+
+- `Club.Name` → `NameI18n` (`Dictionary<string,string>`), `Description` →
+  `DescriptionI18n` (`Dictionary<string,string>?`). Переиспользовать
+  существующие `LocalizedTextDto`/`Localized.Resolve`/`ToDict()` — ничего
+  нового не писать, тот же набор, что уже используют Venue/Event/User.
+- Миграция — **тем же ручным приёмом**, что `MultilingualUserContent`
+  (Шаг 7.5): добавить `*_i18n` nullable → бэкфилл под `'az'` → `NOT NULL`
+  на `NameI18n` → дропнуть старые `name`/`description` → заменить
+  `clubs_search_trgm` (сейчас на голом `name`) на `search_text`
+  (`GENERATED ALWAYS AS (...) STORED` из `name_i18n->>'az'/'ru'/'en'`) +
+  новый `GIN`-индекс. EF-скаффолд *дропнет колонки раньше бэкфилла* — как
+  и в прошлый раз, писать `Up()`/`Down()` руками, не доверять
+  автогенерации порядка операций.
+
+#### Фаза 12.2 — Backend: CRUD клуба
+
+- `Features/Clubs/ClubSlugGenerator.cs` — копия `VenueSlugGenerator`
+  (транслитерация + случайный суффикс), с фолбэком `club-{suffix}` —
+  по конвенции проекта мелкий дублирующийся хелпер лучше общей абстракции.
+- `Features/Clubs/ClubDtos.cs`, `ClubService.cs`: `CreateAsync` (создатель
+  сразу пишется `ClubMember{Role=Owner, Status=Active}` в той же
+  транзакции), `UpdateAsync` (`Owner`/`Admin`), `GetBySlugAsync(slug,
+  locale, viewerId, ct)` — `Private` невидим не-участникам (404, не 403 —
+  не палим сам факт существования), `GetListAsync` — `Public`/`RequestOnly`
+  всем, `Private` только клубы viewer'а, `DeleteAsync` (soft-delete,
+  `Owner` — то же самое, что «только автор» у площадок).
+- `Features/Clubs/ClubsEndpoints.cs`: `GET /api/clubs`, `GET
+  /api/clubs/{slug}`, `POST /api/clubs`, `PATCH /api/clubs/{id}`, `DELETE
+  /api/clubs/{id}` — по образцу `VenuesEndpoints.cs`.
+- Фото (avatar/cover) — тот же `R2StorageService`/presign-flow, что у
+  площадок в Шаге 7, без нового кода в сторадж-слое.
+
+#### Фаза 12.3 — Backend: участники
+
+- `ClubMemberDtos.cs` + методы в `ClubService.cs`: `JoinAsync`
+  (маршрутизация по `Visibility`, см. решение выше), `LeaveAsync`,
+  `InviteAsync` (`Owner`/`Admin`, создаёт `Pending`-приглашение — шлёт
+  `NotificationType.ClubInvite`), `ApproveJoinRequestAsync`/
+  `RejectJoinRequestAsync` (`Owner`/`Admin`), `SetRoleAsync` (только
+  `Owner` назначает `Admin`; смена `Owner` — отдельный `TransferOwnershipAsync`,
+  раз в БД допустим только один активный `Owner`), `RemoveMemberAsync`
+  (`Owner`/`Admin`, себя убрать нельзя — `Owner` сначала передаёт
+  владение), `JoinByInviteCodeAsync`, `RegenerateInviteCodeAsync`.
+- Заявка на вступление в `RequestOnly` шлёт `NotificationType
+  .ClubJoinRequest` всем `Owner`/`Admin` клуба — **первые реальные
+  вызовы** этих двух типов (раньше в Шаге 11 они не входили в
+  `NotificationService.WiredTypes` именно потому, что Clubs не было —
+  добавить оба в список).
+- Эндпоинты в `ClubsEndpoints.cs`: `POST /api/clubs/{id}/join`, `POST
+  /api/clubs/{id}/leave`, `POST /api/clubs/{id}/invite`, `POST
+  /api/clubs/{id}/join-requests/{userId}/approve`|`/reject`, `PATCH
+  /api/clubs/{id}/members/{userId}`, `DELETE
+  /api/clubs/{id}/members/{userId}`, `POST /api/clubs/join/{inviteCode}`,
+  `POST /api/clubs/{id}/invite-code/regenerate`.
+
+#### Фаза 12.4 — Backend: интеграция с событиями
+
+- `CreateEventRequest`/`UpdateEventRequest` уже принимают `ClubId` — добавить
+  проверку в `EventService`: `ClubId` можно поставить только на клуб, где
+  создатель — активный участник (иначе 403, понятная ошибка вместо голого
+  `events_club_visibility` constraint violation).
+- `GetByPublicIdAsync`/`GetListAsync` — `Visibility == Club` событие видно
+  только активным участникам этого клуба (тот же `viewerId`-aware приём,
+  что `VenueService.GetBySlugAsync` для `Draft`).
+
+#### Фаза 12.5 — Frontend
+
+- `clubsApi.ts` — CRUD, участники, инвайт-код (по образцу `venuesApi.ts`).
+- `/clubs` — каталог (фильтр по городу/спорту, как `/venues`), `/clubs/new`,
+  `/clubs/[slug]` (детальная + список участников для членов, кнопки
+  Вступить/Запросить/Покинуть по статусу), `/clubs/[slug]/edit`,
+  `/clubs/[slug]/members` (управление для `Owner`/`Admin`: одобрить/отклонить
+  заявку, роль, удалить, инвайт-код).
+- `EventForm.tsx` — селектор клуба (только те, где участник), делает
+  `EventVisibility.Club` наконец выбираемым (сейчас форма принудительно
+  сводит его к `Public`).
+- Пункт «Клубы» в `SiteHeader`/`MobileNav`.
+- i18n: статусы участников, роли, причины отказа.
+
+---
+
 ## 9. Конвенции
 
 **C#:** nullable reference types включены; `sealed` по умолчанию; async/await везде,
