@@ -10,9 +10,27 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "9.0.x"
+
+      # IntegrationTests поднимает Postgres через Testcontainers — на
+      # ubuntu-latest Docker уже есть из коробки, доп. настройка не нужна.
+      - name: dotnet test
+        run: dotnet test GameOrg.sln --configuration Release
+
   build-and-push:
     name: Build ${{ matrix.image }}
     runs-on: ubuntu-latest
+    needs: test
     permissions:
       contents: read
       packages: write
