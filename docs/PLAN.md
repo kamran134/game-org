@@ -1339,6 +1339,142 @@ Payments — деньги решили отложить до выбора про
 - В браузере не проверялось без локального Docker/Postgres — см. тот же
   честный disclaimer, что в Шаге 13.
 
+### Шаг 15 — Рейтинг и надёжность (Glicko-2)
+
+Домен готов с Шага 2 (`SportRating` — по каждому виду спорта отдельно,
+`ReliabilityStat` — глобальная), кода нет вообще. Разблокировано Шагом 14
+(`EventResult` — раньше эту фичу нельзя было строить, не на чем считать).
+Выбор пользователя из оставшихся кусков генплана, с рекомендацией — как
+логичное продолжение Шага 14.
+
+**Решения по умолчанию (не вопрос пользователю — ни разу не заходила
+речь о формулах в обсуждениях с пользователем, всё ниже — инженерные
+решения по остаточному принципу из уже существующих полей):**
+
+- **Триггер пересчёта** — `EventService.RecordResultAsync`, после
+  сохранения `EventResult`: если `!result.RatingsApplied`, зовёт новый
+  `RatingService.ApplyResultAsync(eventId, ct)`, тот сам ставит
+  `RatingsApplied = true` в конце. **Только один раз** — повторный вызов
+  `RecordResultAsync` (правка результата) пересчёт не триггерит, ровно как
+  и задумано комментарием в домене ("идемпотентность"). Пересматривать
+  задним числом уже применённый рейтинг — отдельная, не запланированная
+  здесь фича.
+- **Glicko-2 — чистая математика**, `Features/Reputation/Glicko2.cs`, без
+  зависимости от БД (как `TelegramLoginValidator` в Шаге 5) — юнит-тесты
+  напрямую, без Testcontainers. Стандартный алгоритм (Glickman, 2013):
+  один Event = один "rating period" на игрока, все его результаты в этом
+  событии сворачиваются в одно обновление μ/φ/σ.
+- **Как считаются пары "игра" для Glicko-2:**
+  - Командный спорт (`event.Teams` — 2+ команды с проставленным `Score`):
+    каждая пара игроков из **разных** команд — один результат
+    (`Score` команды A > B → win для A vs B, равенство → draw). Игроки
+    внутри одной команды друг с другом не сравниваются — Glicko-2 не
+    моделирует "игру с союзником".
+  - Без команд, есть `Standings` (место): каждая пара участников с
+    указанным местом — win/loss по разнице `Place` (меньше — выше).
+  - Ни того, ни другого (организатор записал только текст без счёта) —
+    Glicko-2 не считается вообще, `ReliabilityStat` всё равно обновляется
+    (см. ниже) — это раздельные заботы.
+  - Считаются только участники со статусом `Attended` или `Confirmed` (не
+    `NoShow`/`LateCancel`/`Waitlisted`/`Declined`/`Maybe`) и с `UserId`
+    (гости — вне рейтинга, ставить не на что).
+- **`ReliabilityStat` — тоже в `ApplyResultAsync`, но независимо от
+  наличия счёта:**
+  - `Signups`/`Attended`/`NoShows`/`LateCancels` — инкремент по
+    фактическому `ParticipationStatus` участника на момент записи
+    результата. `HostedEvents` — инкремент создателю события (если у
+    него есть `UserId`).
+  - **`Score` (0-100) — не "штраф с забыванием старых нарушений" в
+    буквальном смысле комментария в домене** (для честного затухания
+    нужна история инцидентов с датами, которой в схеме нет — заводить
+    новую таблицу ради этого не входит в объём). Вместо этого — доля:
+    `100 × (1 − (NoShows + LateCancels×0.5) / (Attended + NoShows +
+    LateCancels))`. Тот же практический эффект (старое единичное
+    нарушение теряет вес по мере роста знаменателя — игрок "отыгрывает"
+    репутацию явками), без отдельной таблицы истории.
+  - `CurrentStreak`/`LongestStreak` ("недель подряд с игрой") — **не
+    инкремент, а пересчёт с нуля** по факту: выборка всех `Attended`-
+    участий пользователя по `EventParticipants` (across sports —
+    надёжность глобальная), недели по `Event.StartsAt`, чистая функция
+    `ReliabilityCalculator.ComputeStreaks(List<DateTime>, DateTime now)`
+    — тоже юнит-тестируемая без БД.
+- **Чтение** — не отдельный профиль, расширение уже существующих
+  ответов: `UserSportDto`/`PublicUserSportDto` (в `ProfileDtos.cs`)
+  получают `Rating`/`GamesPlayed`/`Wins`/`Draws`/`Losses` (уже есть в
+  `SportRating`, просто не отдавались); `MeProfileDto`/`PublicProfileDto`
+  — `ReliabilityScore`. Плюс один новый эндпоинт — лидерборд по виду
+  спорта (нигде так и не появился до этого шага): `GET
+  /api/sports/{slug}/leaderboard`.
+
+#### Фаза 15.1 — Backend: Glicko-2
+
+- `Features/Reputation/Glicko2.cs` — `Rating(double Mu, double Phi, double
+  Sigma)`, `Calculate(Rating player, List<(Rating Opponent, double Score)>
+  games) → Rating` — конвертация в/из шкалы Glicko-2, вычисление `v`,
+  `delta`, новой волатильности (итерация Illinois), новых `φ`/`μ`. Без
+  игр за период — `φ` растёт (неопределённость), `μ`/`σ` не трогаются
+  (стандартное поведение алгоритма).
+- Юнит-тесты — из официального примера Glickman'а (известные
+  контрольные числа) + вырожденные случаи (нет игр, только победы/только
+  поражения).
+
+#### Фаза 15.2 — Backend: надёжность
+
+- `Features/Reputation/ReliabilityCalculator.cs` — чистые функции:
+  `ComputeScore(int attended, int noShows, int lateCancels) → int`,
+  `ComputeStreaks(List<DateTime> attendedDates, DateTime now) → (int
+  Current, int Longest)`.
+- Юнит-тесты: score — граничные комбинации (0 игр → 100, только NoShow →
+  низкий скор); streaks — соседние недели, разрыв, несколько игр в одной
+  неделе (считается как одна), текущая неделя без игры пока не рвёт
+  `CurrentStreak` (если последняя игра была на прошлой неделе — стрик
+  жив, "подряд" считаем по неделям с игрой, не по календарным дням).
+
+#### Фаза 15.3 — Backend: применение и чтение
+
+- `Features/Reputation/RatingService.cs`: `ApplyResultAsync(eventId, ct)`
+  — грузит участников (`Attended`/`Confirmed`, есть `UserId`), команды
+  или standings, строит пары, зовёт `Glicko2.Calculate` на каждого
+  участника по его виду спорта (`event.SportId`), апсертит `SportRating`
+  (`GamesPlayed`/`Wins`/`Draws`/`Losses`/`PeakRating`/`LastPlayedAt`),
+  параллельно апсертит `ReliabilityStat` всем участникам (не только
+  сыгравшим в рейтинге), выставляет `EventResult.RatingsApplied = true`.
+  `GetLeaderboardAsync(sportSlug, take, ct)` — топ `SportRating.Rating`
+  по виду спорта.
+- `EventService.RecordResultAsync` — зовёт `ApplyResultAsync` после
+  сохранения результата (см. решение выше).
+- `Features/Reputation/ReputationDtos.cs`: `LeaderboardEntryDto(Guid
+  UserId, string Handle, string DisplayName, double Rating, int
+  GamesPlayed, int Wins, int Draws, int Losses)`.
+- `Features/Reputation/ReputationEndpoints.cs`: `GET
+  /api/sports/{slug}/leaderboard` (анонимный).
+- `ProfileDtos.cs`: `UserSportDto`/`PublicUserSportDto` — добавить
+  `Rating`/`GamesPlayed`/`Wins`/`Draws`/`Losses`; `MeProfileDto`/
+  `PublicProfileDto` — добавить `ReliabilityScore`. `ProfileEndpoints.cs`
+  — подтянуть эти поля при маппинге (join на `SportRating`/
+  `ReliabilityStat`).
+- `Program.cs`: `AddScoped<RatingService>()`, `MapReputationEndpoints()`.
+
+#### Фаза 15.4 — Frontend
+
+- `eventsApi.ts`/новый `reputationApi.ts` — типы под расширенные
+  `UserSport`/профиль, `getLeaderboard`.
+- `/me`, `/[handle]` — рейтинг и W-D-L рядом с каждым видом спорта в
+  списке, бейдж надёжности (`ReliabilityScore`) в шапке профиля.
+- `/sports/[slug]/leaderboard` (новый маршрут — у `/sports` до сих пор не
+  было страницы отдельного вида спорта) — таблица топ-игроков, ссылка с
+  карточки вида спорта на `/sports`.
+- i18n: `Reputation.*` (или `Profile.rating*`/`Sports.leaderboard*` —
+  решить по месту, не разводить лишний namespace ради трёх строк).
+
+#### Фаза 15.5 — Сборка и проверка
+
+- `dotnet build`/`dotnet test` (новые юниты на Glicko-2/надёжность —
+  обязаны быть зелёными, это единственная проверка правильности формул
+  без реального прогона игр), `pnpm --filter web run build`, `pnpm run
+  lint`.
+- В браузере не проверялось — тот же disclaimer, что в Шагах 13/14.
+
 ---
 
 ## 9. Конвенции
