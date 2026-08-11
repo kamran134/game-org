@@ -95,6 +95,9 @@
     "removeSportError": "İdman növü silinmədi",
     "mySportsHeading": "Mənim idman növlərim",
     "noSports": "Hələ heç bir idman növü əlavə edilməyib.",
+    "reliabilityScore": "Etibarlılıq: {score}/100",
+    "rating": "Reytinq {rating}",
+    "record": "{wins}Q-{draws}B-{losses}M",
     "remove": "Sil",
     "addSportPlaceholder": "İdman növü əlavə et…",
     "add": "Əlavə et",
@@ -115,10 +118,18 @@
   "Profile": {
     "notFound": "Profil tapılmadı",
     "descriptionFallback": "{name} oyunçusunun game.org.az-dakı profili",
-    "followersCount": "{count} izləyici"
+    "followersCount": "{count} izləyici",
+    "reliabilityScore": "Etibarlılıq: {score}/100",
+    "rating": "Reytinq {rating}",
+    "record": "{wins}Q-{draws}B-{losses}M"
   },
   "Sports": {
-    "pageTitle": "İdman növləri"
+    "pageTitle": "İdman növləri",
+    "notFound": "İdman növü tapılmadı",
+    "leaderboard": "Reytinq",
+    "leaderboardHeading": "Reytinq: {sport}",
+    "leaderboardEmpty": "Hələ heç kim reytinq oyunu oynamayıb.",
+    "record": "{wins}Q-{draws}B-{losses}M"
   },
   "Venues": {
     "pageTitle": "Meydançalar",

@@ -24,6 +24,11 @@ export type UserSport = {
   note?: string | null;
   visibility: Visibility;
   positions: UserSportPosition[];
+  rating: number;
+  gamesPlayed: number;
+  wins: number;
+  draws: number;
+  losses: number;
 };
 export type MeProfile = {
   id: string;
@@ -43,6 +48,7 @@ export type MeProfile = {
   sports: UserSport[];
   followersCount: number;
   followingCount: number;
+  reliabilityScore: number;
   // Резолвнутые displayName/bio выше — для отображения. Эти два — сырые
   // словари по всем языкам, только для формы редактирования (/me).
   displayNameI18n: LocalizedText;

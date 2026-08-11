@@ -77,6 +77,7 @@ export default async function PublicProfilePage({
   // состояние подписки FollowButton определяет сам на клиенте.
   const profileId = profile.additionalData?.id as string | undefined;
   const followersCount = profile.additionalData?.followersCount as number | undefined;
+  const reliabilityScore = profile.additionalData?.reliabilityScore as number | undefined;
 
   return (
     <main className="flex-1 bg-brand-background px-6 py-16">
@@ -90,6 +91,9 @@ export default async function PublicProfilePage({
               <MapPinLine size={16} weight="bold" />
               {cityName ?? profile.city.slug}
             </p>
+          )}
+          {reliabilityScore != null && (
+            <p className="mt-2 text-sm text-foreground/60">{t("reliabilityScore", { score: reliabilityScore })}</p>
           )}
           <p className="mt-3 flex items-center gap-3 text-sm text-foreground/60">
             {followersCount != null && (
@@ -111,18 +115,36 @@ export default async function PublicProfilePage({
 
         {profile.sports && profile.sports.length > 0 && (
           <ul className="mt-6 flex flex-col gap-3">
-            {profile.sports.map((s, i) => (
-              <li
-                key={i}
-                className="flex items-center justify-between rounded-2xl border border-brand-border bg-background px-5 py-4 transition-colors duration-200 hover:border-brand-primary/40"
-              >
-                <span className="flex items-center gap-2 font-medium text-foreground">
-                  <span className="text-lg">{s.sportEmoji}</span>
-                  {s.sportSlug}
-                </span>
-                <span className="text-sm text-brand-muted-foreground">{s.level ? tLevels(s.level) : null}</span>
-              </li>
-            ))}
+            {profile.sports.map((s, i) => {
+              // rating/gamesPlayed/wins/draws/losses — новые поля с Шага 15, тот же
+              // additionalData-приём, что и для id/followersCount выше.
+              const gamesPlayed = s.additionalData?.gamesPlayed as number | undefined;
+              const rating = s.additionalData?.rating as number | undefined;
+              const wins = s.additionalData?.wins as number | undefined;
+              const draws = s.additionalData?.draws as number | undefined;
+              const losses = s.additionalData?.losses as number | undefined;
+
+              return (
+                <li
+                  key={i}
+                  className="flex items-center justify-between rounded-2xl border border-brand-border bg-background px-5 py-4 transition-colors duration-200 hover:border-brand-primary/40"
+                >
+                  <span className="flex items-center gap-2 font-medium text-foreground">
+                    <span className="text-lg">{s.sportEmoji}</span>
+                    {s.sportSlug}
+                  </span>
+                  <span className="flex items-center gap-3 text-sm text-brand-muted-foreground">
+                    {!!gamesPlayed && (
+                      <span>
+                        {t("rating", { rating: Math.round(rating ?? 1500) })} ·{" "}
+                        {t("record", { wins: wins ?? 0, draws: draws ?? 0, losses: losses ?? 0 })}
+                      </span>
+                    )}
+                    {s.level ? tLevels(s.level) : null}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

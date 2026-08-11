@@ -57,6 +57,7 @@ export function MeView({ apiUrl }: { apiUrl: string }) {
           <div>
             <h1 className="font-heading text-2xl font-semibold text-foreground">{profile.displayName}</h1>
             <p className="mt-1 text-sm text-brand-muted-foreground">@{profile.handle}</p>
+            <p className="mt-2 text-sm text-foreground/60">{t("reliabilityScore", { score: profile.reliabilityScore })}</p>
           </div>
           <Link
             href="/me/edit"
@@ -119,7 +120,14 @@ export function MeView({ apiUrl }: { apiUrl: string }) {
                   <span className="text-lg">{s.sportEmoji}</span>
                   {s.sportSlug}
                 </span>
-                <span className="text-sm text-brand-muted-foreground">{tLevels(s.level)}</span>
+                <span className="flex items-center gap-3 text-sm text-brand-muted-foreground">
+                  {s.gamesPlayed > 0 && (
+                    <span>
+                      {t("rating", { rating: Math.round(s.rating) })} · {t("record", { wins: s.wins, draws: s.draws, losses: s.losses })}
+                    </span>
+                  )}
+                  {tLevels(s.level)}
+                </span>
               </li>
             ))}
           </ul>

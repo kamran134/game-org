@@ -95,6 +95,9 @@
     "removeSportError": "Failed to remove sport",
     "mySportsHeading": "My sports",
     "noSports": "No sports added yet.",
+    "reliabilityScore": "Reliability: {score}/100",
+    "rating": "Rating {rating}",
+    "record": "{wins}W-{draws}D-{losses}L",
     "remove": "Remove",
     "addSportPlaceholder": "Add a sport…",
     "add": "Add",
@@ -115,10 +118,18 @@
   "Profile": {
     "notFound": "Profile not found",
     "descriptionFallback": "{name}'s player profile on game.org.az",
-    "followersCount": "{count} followers"
+    "followersCount": "{count} followers",
+    "reliabilityScore": "Reliability: {score}/100",
+    "rating": "Rating {rating}",
+    "record": "{wins}W-{draws}D-{losses}L"
   },
   "Sports": {
-    "pageTitle": "Sports"
+    "pageTitle": "Sports",
+    "notFound": "Sport not found",
+    "leaderboard": "Leaderboard",
+    "leaderboardHeading": "Leaderboard: {sport}",
+    "leaderboardEmpty": "No one has played a rated game yet.",
+    "record": "{wins}W-{draws}D-{losses}L"
   },
   "Venues": {
     "pageTitle": "Venues",

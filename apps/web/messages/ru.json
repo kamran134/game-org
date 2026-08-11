@@ -95,6 +95,9 @@
     "removeSportError": "Не удалось удалить вид спорта",
     "mySportsHeading": "Мои виды спорта",
     "noSports": "Пока не добавлено ни одного вида спорта.",
+    "reliabilityScore": "Надёжность: {score}/100",
+    "rating": "Рейтинг {rating}",
+    "record": "{wins}П-{draws}Н-{losses}П",
     "remove": "Удалить",
     "addSportPlaceholder": "Добавить вид спорта…",
     "add": "Добавить",
@@ -115,10 +118,18 @@
   "Profile": {
     "notFound": "Профиль не найден",
     "descriptionFallback": "Профиль игрока {name} на game.org.az",
-    "followersCount": "{count} подписчиков"
+    "followersCount": "{count} подписчиков",
+    "reliabilityScore": "Надёжность: {score}/100",
+    "rating": "Рейтинг {rating}",
+    "record": "{wins}П-{draws}Н-{losses}П"
   },
   "Sports": {
-    "pageTitle": "Виды спорта"
+    "pageTitle": "Виды спорта",
+    "notFound": "Вид спорта не найден",
+    "leaderboard": "Рейтинг",
+    "leaderboardHeading": "Рейтинг: {sport}",
+    "leaderboardEmpty": "Пока никто не сыграл рейтинговую игру.",
+    "record": "{wins}П-{draws}Н-{losses}П"
   },
   "Venues": {
     "pageTitle": "Площадки",

@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { createApiClient } from "@/lib/apiClient";
+import { Link } from "@/i18n/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -19,19 +20,26 @@ export default async function SportsPage({ params }: { params: Promise<{ locale:
           {sports.map((sport) => (
             <li
               key={sport.id}
-              className="flex items-center gap-3 rounded-2xl border border-brand-border bg-background px-4 py-3 transition-colors duration-200 hover:border-brand-primary/40"
+              className="flex items-center justify-between gap-3 rounded-2xl border border-brand-border bg-background px-4 py-3 transition-colors duration-200 hover:border-brand-primary/40"
             >
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-primary/10 text-xl">
-                {sport.emoji}
+              <span className="flex items-center gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-primary/10 text-xl">
+                  {sport.emoji}
+                </span>
+                {/*
+                  nameI18n — открытый словарь (Dictionary<string,string> в C#, "additionalProperties"
+                  в OpenAPI), у него нет фиксированных полей в схеме — Kiota кладёт значения
+                  в additionalData, а не как обычные именованные свойства.
+                */}
+                <span className="font-medium text-foreground">
+                  {(sport.nameI18n?.additionalData?.[locale] as string | undefined) ?? sport.slug}
+                </span>
               </span>
-              {/*
-                nameI18n — открытый словарь (Dictionary<string,string> в C#, "additionalProperties"
-                в OpenAPI), у него нет фиксированных полей в схеме — Kiota кладёт значения
-                в additionalData, а не как обычные именованные свойства.
-              */}
-              <span className="font-medium text-foreground">
-                {(sport.nameI18n?.additionalData?.[locale] as string | undefined) ?? sport.slug}
-              </span>
+              {sport.slug && (
+                <Link href={`/sports/${sport.slug}/leaderboard`} className="shrink-0 text-sm font-medium text-brand-primary hover:underline">
+                  {t("leaderboard")}
+                </Link>
+              )}
             </li>
           ))}
         </ul>
