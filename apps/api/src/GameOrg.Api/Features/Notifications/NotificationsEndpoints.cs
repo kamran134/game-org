@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using GameOrg.Domain;
 using GameOrg.Infrastructure.Notifications;
+using Microsoft.AspNetCore.Mvc;
 
 namespace GameOrg.Api.Features.Notifications;
 
@@ -106,7 +107,7 @@ public static class NotificationsEndpoints
         .RequireAuthorization();
 
         app.MapDelete("/api/me/devices", async (
-            UnregisterDeviceRequest request, ClaimsPrincipal principal, DeviceService deviceService, CancellationToken ct) =>
+            [FromBody] UnregisterDeviceRequest request, ClaimsPrincipal principal, DeviceService deviceService, CancellationToken ct) =>
         {
             var userId = GetUserId(principal);
             if (userId is null) return Results.Unauthorized();
