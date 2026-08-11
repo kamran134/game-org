@@ -1,4 +1,5 @@
 using GameOrg.Api.Common;
+using GameOrg.Api.Features.Payments;
 using GameOrg.Api.Features.Sports;
 using GameOrg.Domain;
 
@@ -74,6 +75,9 @@ public sealed record EventDetailDto(
     EventResultDto? Result,
     List<MvpTallyEntryDto> MvpTally,
     Guid? MyMvpVote,
+    // Только собственный платёж viewer'а (Шаг 18) — список чужих платежей не светим,
+    // отдельный GET /api/events/{id}/payments для создателя/модератора.
+    PaymentSummaryDto? MyPayment,
     // Резолвнутые Title/Description выше — для страницы просмотра. Эти два —
     // сырые словари по всем языкам, только для формы редактирования.
     LocalizedTextDto? TitleI18n,

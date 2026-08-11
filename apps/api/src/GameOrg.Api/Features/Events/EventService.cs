@@ -1,6 +1,7 @@
 using GameOrg.Api.Common;
 using GameOrg.Api.Features.Clubs;
 using GameOrg.Api.Features.Moderation;
+using GameOrg.Api.Features.Payments;
 using GameOrg.Api.Features.Reputation;
 using GameOrg.Api.Features.Social;
 using GameOrg.Api.Features.Sports;
@@ -19,7 +20,8 @@ public sealed class EventService(
     AuditLogService auditLog,
     ClubService clubService,
     ActivityService activityService,
-    RatingService ratingService)
+    RatingService ratingService,
+    PaymentService paymentService)
 {
     public async Task<(Event? Result, string? Error)> CreateAsync(Guid userId, CreateEventRequest request, CancellationToken ct)
     {
@@ -170,7 +172,9 @@ public sealed class EventService(
             mvpDisplayName = mvpUser is not null ? Localized.Resolve(mvpUser.DisplayNameI18n, locale) : null;
         }
 
-        return MapDetail(ev, locale, mvpDisplayName, mvpTally, myVote);
+        var myPayment = viewerId is null ? null : await paymentService.GetMyPaymentForEventAsync(ev.Id, viewerId.Value, ct);
+
+        return MapDetail(ev, locale, mvpDisplayName, mvpTally, myVote, myPayment);
     }
 
     /// <summary>
@@ -451,6 +455,12 @@ public sealed class EventService(
         await db.SaveChangesAsync(ct);
         await RecomputeCountsAsync(eventId, ct);
 
+        if (status == ParticipationStatus.Confirmed)
+        {
+            await paymentService.EnsurePaymentAsync(eventId, participant.Id, ct);
+            await paymentService.RecomputeTotalSplitAsync(eventId, ct);
+        }
+
         if (status == ParticipationStatus.Confirmed && ev.Visibility == EventVisibility.Public)
             await activityService.EmitAsync(userId, ActivityVerb.JoinedEvent, eventId, null, null, null, ct);
 
@@ -479,7 +489,9 @@ public sealed class EventService(
 
         db.EventParticipants.Remove(participant);
         await db.SaveChangesAsync(ct);
+        await paymentService.CancelPendingForParticipantAsync(participantId, ct);
         await RecomputeCountsAsync(eventId, ct);
+        await paymentService.RecomputeTotalSplitAsync(eventId, ct);
         // Освободившийся Confirmed-слот (если он был) может освободить место
         // под первого в очереди — метод сам разбирается, есть ли вообще
         // свободные места и очередь; безопасно звать всегда, а не только
@@ -528,6 +540,11 @@ public sealed class EventService(
         db.EventParticipants.Add(guest);
         await db.SaveChangesAsync(ct);
         await RecomputeCountsAsync(eventId, ct);
+        // У гостя нет UserId — платить ему не выставляем (EnsurePaymentAsync это и так
+        // отсекает), но он всё равно занимает место в ConfirmedCount — при CostSplit.Total
+        // это меняет сумму на человека для остальных.
+        if (status == ParticipationStatus.Confirmed)
+            await paymentService.RecomputeTotalSplitAsync(eventId, ct);
 
         return (new EventParticipantDto(guest.Id, null, guest.GuestName, guest.GuestName, guest.Status, guest.WaitlistOrder, guest.JoinedAt), null);
     }
@@ -545,6 +562,7 @@ public sealed class EventService(
         ev.UpdatedAt = DateTime.UtcNow;
 
         await db.SaveChangesAsync(ct);
+        await paymentService.CancelAllPendingForEventAsync(eventId, ct);
 
         // Немедленно (не по расписанию, как напоминания) — SendAsync сам
         // идемпотентен по DedupeKey, повторный вызов CancelAsync (если бы
@@ -626,6 +644,8 @@ public sealed class EventService(
         next.StatusChangedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
         await RecomputeCountsAsync(eventId, ct);
+        await paymentService.EnsurePaymentAsync(eventId, next.Id, ct);
+        await paymentService.RecomputeTotalSplitAsync(eventId, ct);
 
         if (next.UserId is not null)
         {
@@ -705,7 +725,7 @@ public sealed class EventService(
         e.MaxParticipants, e.ConfirmedCount, e.Cost, e.Currency);
 
     private static EventDetailDto MapDetail(
-        Event e, string locale, string? mvpDisplayName, List<MvpTallyEntryDto> mvpTally, Guid? myVote) => new(
+        Event e, string locale, string? mvpDisplayName, List<MvpTallyEntryDto> mvpTally, Guid? myVote, PaymentSummaryDto? myPayment) => new(
         e.Id, e.PublicId, e.Type, e.Status, e.Visibility,
         new SportDto(e.Sport.Id, e.Sport.Slug, e.Sport.NameI18n, e.Sport.Emoji, e.Sport.HasPositions, e.Sport.IsTeamSport),
         e.ClubId,
@@ -730,6 +750,7 @@ public sealed class EventService(
         e.Result is null ? null : new EventResultDto(e.Result.Summary, e.Result.Standings, e.Result.MvpUserId, mvpDisplayName, e.Result.RecordedById, e.Result.RecordedAt),
         mvpTally,
         myVote,
+        myPayment,
         LocalizedTextDto.FromNullable(e.TitleI18n),
         LocalizedTextDto.FromNullable(e.DescriptionI18n));
 

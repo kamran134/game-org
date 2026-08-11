@@ -45,12 +45,10 @@ public sealed class NotificationService(GameOrgDbContext db)
     }
 
     /// <summary>
-    /// Только реально вызываемые типы — остальные (PaymentDue/PaymentConfirmed) числятся
-    /// в enum'е под ещё не построенную фичу (Payment), показывать для них переключатель было
-    /// бы мёртвым UI. Список расширять по мере того, как эти типы начинают реально отправляться
-    /// в NotificationSender.SendAsync. ClubInvite/ClubJoinRequest — Шаг 12, NewFollower — Шаг 13,
-    /// MvpVoteOpen/ResultPosted — Шаг 14 (пропущены при вводе, добавлены задним числом здесь),
-    /// AchievementEarned — Шаг 16.
+    /// Только реально вызываемые типы. Список расширять по мере того, как эти типы начинают
+    /// реально отправляться в NotificationSender.SendAsync. ClubInvite/ClubJoinRequest — Шаг 12,
+    /// NewFollower — Шаг 13, MvpVoteOpen/ResultPosted — Шаг 14 (пропущены при вводе, добавлены
+    /// задним числом здесь), AchievementEarned — Шаг 16, PaymentDue/PaymentConfirmed — Шаг 18.
     /// </summary>
     private static readonly NotificationType[] WiredTypes =
     [
@@ -68,6 +66,8 @@ public sealed class NotificationService(GameOrgDbContext db)
         NotificationType.MvpVoteOpen,
         NotificationType.ResultPosted,
         NotificationType.AchievementEarned,
+        NotificationType.PaymentDue,
+        NotificationType.PaymentConfirmed,
     ];
 
     /// <summary>
