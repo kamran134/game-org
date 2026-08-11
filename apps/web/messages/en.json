@@ -18,7 +18,10 @@
     "login": "Sign in",
     "logout": "Sign out",
     "menu": "Menu",
-    "close": "Close"
+    "close": "Close",
+    "settings": "Settings",
+    "language": "Language",
+    "theme": "Theme"
   },
   "Landing": {
     "badge": "game.org.az — a sports social network for Azerbaijan",

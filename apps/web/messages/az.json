@@ -18,7 +18,10 @@
     "login": "Giriş",
     "logout": "Çıxış",
     "menu": "Menyu",
-    "close": "Bağla"
+    "close": "Bağla",
+    "settings": "Ayarlar",
+    "language": "Dil",
+    "theme": "Tema"
   },
   "Landing": {
     "badge": "game.org.az — Azərbaycan üçün idman sosial şəbəkəsi",

@@ -1,8 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { CalendarBlank, MapPinLine, SoccerBall, UsersThree } from "@phosphor-icons/react/dist/ssr";
 import { Link } from "@/i18n/navigation";
-import { LocaleSwitcher } from "@/components/LocaleSwitcher";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { SettingsMenu } from "@/components/SettingsMenu";
 import { UserMenu } from "@/components/UserMenu";
 import { MobileNav } from "@/components/MobileNav";
 
@@ -44,9 +43,7 @@ export async function SiteHeader() {
         </nav>
 
         <div className="hidden shrink-0 items-center gap-3 sm:flex">
-          <LocaleSwitcher />
-          <span className="h-4 w-px bg-foreground/15" />
-          <ThemeToggle />
+          <SettingsMenu />
           <span className="h-4 w-px bg-foreground/15" />
           <UserMenu apiUrl={apiUrl} />
         </div>
