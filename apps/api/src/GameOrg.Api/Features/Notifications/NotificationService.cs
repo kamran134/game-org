@@ -70,11 +70,15 @@ public sealed class NotificationService(GameOrgDbContext db)
         NotificationType.AchievementEarned,
     ];
 
-    /// <summary>Opt-out: строки нет → включено. Один и тот же принцип, что в NotificationSender.IsChannelEnabledAsync.</summary>
-    public async Task<List<NotificationPreferenceDto>> GetPreferencesAsync(Guid userId, CancellationToken ct)
+    /// <summary>
+    /// Opt-out: строки нет → включено. Один и тот же принцип, что в NotificationSender.IsChannelEnabledAsync.
+    /// channel по умолчанию Telegram — существующий фронт (Шаг 11) не передаёт параметр,
+    /// Push (Шаг 17) получил тот же набор WiredTypes через явный channel=Push.
+    /// </summary>
+    public async Task<List<NotificationPreferenceDto>> GetPreferencesAsync(Guid userId, NotificationChannel channel, CancellationToken ct)
     {
         var disabled = await db.NotificationPreferences
-            .Where(p => p.UserId == userId && p.Channel == NotificationChannel.Telegram && !p.Enabled)
+            .Where(p => p.UserId == userId && p.Channel == channel && !p.Enabled)
             .Select(p => p.Type)
             .ToListAsync(ct);
         var disabledSet = disabled.ToHashSet();
@@ -84,10 +88,10 @@ public sealed class NotificationService(GameOrgDbContext db)
             .ToList();
     }
 
-    public async Task SetPreferenceAsync(Guid userId, NotificationType type, bool enabled, CancellationToken ct)
+    public async Task SetPreferenceAsync(Guid userId, NotificationType type, NotificationChannel channel, bool enabled, CancellationToken ct)
     {
         var pref = await db.NotificationPreferences
-            .FirstOrDefaultAsync(p => p.UserId == userId && p.Type == type && p.Channel == NotificationChannel.Telegram, ct);
+            .FirstOrDefaultAsync(p => p.UserId == userId && p.Type == type && p.Channel == channel, ct);
 
         if (pref is null)
         {
@@ -95,7 +99,7 @@ public sealed class NotificationService(GameOrgDbContext db)
             {
                 UserId = userId,
                 Type = type,
-                Channel = NotificationChannel.Telegram,
+                Channel = channel,
                 Enabled = enabled,
             });
         }

@@ -87,6 +87,7 @@ builder.Services.AddScoped<EventService>();
 builder.Services.AddScoped<AuditLogService>();
 builder.Services.AddScoped<ReportService>();
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<DeviceService>();
 builder.Services.AddScoped<ClubService>();
 builder.Services.AddScoped<FollowService>();
 builder.Services.AddScoped<ActivityService>();
@@ -94,6 +95,7 @@ builder.Services.AddScoped<AchievementService>();
 builder.Services.AddScoped<RatingService>();
 
 builder.Services.AddHttpClient<TelegramSender>();
+builder.Services.AddSingleton<WebPushSender>();
 builder.Services.AddScoped<NotificationSender>();
 builder.Services.AddScoped<EventReminderJob>();
 

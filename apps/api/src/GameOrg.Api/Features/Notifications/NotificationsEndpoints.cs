@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using GameOrg.Domain;
+using GameOrg.Infrastructure.Notifications;
 
 namespace GameOrg.Api.Features.Notifications;
 
@@ -58,12 +59,13 @@ public static class NotificationsEndpoints
         .WithTags("Notifications")
         .RequireAuthorization();
 
-        app.MapGet("/api/me/notification-preferences", async (ClaimsPrincipal principal, NotificationService notificationService, CancellationToken ct) =>
+        app.MapGet("/api/me/notification-preferences", async (
+            NotificationChannel? channel, ClaimsPrincipal principal, NotificationService notificationService, CancellationToken ct) =>
         {
             var userId = GetUserId(principal);
             if (userId is null) return Results.Unauthorized();
 
-            return Results.Ok(await notificationService.GetPreferencesAsync(userId.Value, ct));
+            return Results.Ok(await notificationService.GetPreferencesAsync(userId.Value, channel ?? NotificationChannel.Telegram, ct));
         })
         .WithName("GetNotificationPreferences")
         .WithTags("Notifications")
@@ -71,15 +73,48 @@ public static class NotificationsEndpoints
         .Produces<List<NotificationPreferenceDto>>();
 
         app.MapPut("/api/me/notification-preferences/{type}", async (
-            NotificationType type, UpdateNotificationPreferenceRequest request, ClaimsPrincipal principal, NotificationService notificationService, CancellationToken ct) =>
+            NotificationType type, NotificationChannel? channel, UpdateNotificationPreferenceRequest request,
+            ClaimsPrincipal principal, NotificationService notificationService, CancellationToken ct) =>
         {
             var userId = GetUserId(principal);
             if (userId is null) return Results.Unauthorized();
 
-            await notificationService.SetPreferenceAsync(userId.Value, type, request.Enabled, ct);
+            await notificationService.SetPreferenceAsync(userId.Value, type, channel ?? NotificationChannel.Telegram, request.Enabled, ct);
             return Results.NoContent();
         })
         .WithName("UpdateNotificationPreference")
+        .WithTags("Notifications")
+        .RequireAuthorization();
+
+        app.MapGet("/api/push/vapid-public-key", (WebPushSender webPushSender) =>
+            webPushSender.VapidPublicKey is null ? Results.NotFound() : Results.Ok(new { publicKey = webPushSender.VapidPublicKey }))
+        .WithName("GetVapidPublicKey")
+        .WithTags("Notifications")
+        .Produces(StatusCodes.Status404NotFound);
+
+        app.MapPost("/api/me/devices", async (
+            RegisterDeviceRequest request, ClaimsPrincipal principal, DeviceService deviceService, CancellationToken ct) =>
+        {
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            await deviceService.RegisterAsync(userId.Value, request, ct);
+            return Results.NoContent();
+        })
+        .WithName("RegisterDevice")
+        .WithTags("Notifications")
+        .RequireAuthorization();
+
+        app.MapDelete("/api/me/devices", async (
+            UnregisterDeviceRequest request, ClaimsPrincipal principal, DeviceService deviceService, CancellationToken ct) =>
+        {
+            var userId = GetUserId(principal);
+            if (userId is null) return Results.Unauthorized();
+
+            await deviceService.UnregisterAsync(userId.Value, request.Token, ct);
+            return Results.NoContent();
+        })
+        .WithName("UnregisterDevice")
         .WithTags("Notifications")
         .RequireAuthorization();
 
