@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { useRouter } from "@/i18n/navigation";
 import { fetchMe, type MeProfile } from "@/lib/authApi";
 import {
   approveEventJoinRequest,
@@ -14,6 +15,7 @@ import {
 export function JoinRequestsSection({ apiUrl, event }: { apiUrl: string; event: EventDetail }) {
   const t = useTranslations("Events");
   const locale = useLocale();
+  const router = useRouter();
 
   const [me, setMe] = useState<MeProfile | null | undefined>(undefined);
   const [requests, setRequests] = useState<EventJoinRequestItem[] | null>(null);
@@ -44,6 +46,10 @@ export function JoinRequestsSection({ apiUrl, event }: { apiUrl: string; event: 
       if (action === "approve") await approveEventJoinRequest(apiUrl, locale, event.id, participantId);
       else await rejectEventJoinRequest(apiUrl, locale, event.id, participantId);
       setRequests((prev) => prev?.filter((r) => r.participantId !== participantId) ?? null);
+      // ParticipantsSection — сосед на этой же странице, свой useState посеян
+      // из event.participants один раз при монтировании; без этого approve
+      // не долетает до списка участников, пока страницу не перезагрузят руками.
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("joinRequests.actionError"));
     } finally {

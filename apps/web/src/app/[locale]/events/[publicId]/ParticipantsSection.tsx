@@ -19,6 +19,19 @@ export function ParticipantsSection({ apiUrl, locale, event }: { apiUrl: string;
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // useState(event.participants) сеет только на первом рендере — без этого
+  // router.refresh() из JoinRequestsSection (одобрение заявки — соседняя
+  // секция на той же странице) присылает свежий event сюда пропом, но
+  // список остаётся старым, пока страницу не перезагрузить руками. Сброс
+  // прямо в теле рендера (не в эффекте) — приём из React-доков для
+  // производных от пропов состояний, без лишнего лишнего прохода рендера.
+  const [prevEventParticipants, setPrevEventParticipants] = useState(event.participants);
+  if (prevEventParticipants !== event.participants) {
+    setPrevEventParticipants(event.participants);
+    setParticipants(event.participants);
+    setStatus(event.status);
+  }
+
   useEffect(() => {
     fetchMe(apiUrl, locale)
       .then(setMe)
