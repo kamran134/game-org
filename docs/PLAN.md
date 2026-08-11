@@ -1475,6 +1475,109 @@ Payments — деньги решили отложить до выбора про
   lint`.
 - В браузере не проверялось — тот же disclaimer, что в Шагах 13/14.
 
+### Шаг 16 — Достижения (Achievement)
+
+Домен и сид-данные готовы с Шага 2 (`Achievement`/`UserAchievement`,
+все 7 ачивок из §7 — `FIRST_GAME`/`TEN_GAMES`/`FIFTY_GAMES`/`IRON_MAN`/
+`MVP_FIRST`/`RELIABLE`/`MULTI_SPORT` — уже сидируются `DataSeeder`),
+кода на выдачу нет вообще. Разблокировано Шагами 14-15 (`EventResult`,
+`SportRating`, `ReliabilityStat` — есть на чём проверять условия).
+Выбор пользователя из оставшихся кусков генплана, с рекомендацией.
+
+**Решения по умолчанию (не вопрос пользователю — условия ачивок описаны
+в §7 названием и одной фразой, конкретные пороги/интерпретация — инженерное
+решение по остаточному принципу):**
+
+- **Единая точка проверки** — `AchievementService.CheckAndAwardAsync(userId,
+  eventId, ct)`, вызывается из `RatingService.ApplyResultAsync` для
+  каждого участника события (тот же момент, где уже свежие `SportRating`/
+  `ReliabilityStat`/`EventResult.MvpUserId` — не нужно тащить данные
+  отдельными запросами). Перепроверяет **все** условия при каждом вызове,
+  выдаёт только то, чего ещё нет (`UserAchievements` — источник истины,
+  не кэш).
+- **Условия:**
+  - `FIRST_GAME`/`TEN_GAMES`/`FIFTY_GAMES` — сумма `SportRating.GamesPlayed`
+    по всем видам спорта пользователя ≥ 1/10/50.
+  - `IRON_MAN` — `ReliabilityStat.CurrentStreak` ≥ 4 (недели подряд с игрой,
+    Шаг 15).
+  - `MVP_FIRST` — пользователь — `EventResult.MvpUserId` **этого** события
+    (проверка "не первый ли раз" не нужна отдельно: `AwardIfNotEarned`
+    сама не выдаст повторно, а значит достаточно факта "MVP сейчас").
+  - `RELIABLE` — `ReliabilityStat.Attended` ≥ 20 **и** `NoShows == 0`
+    (за всё время, не скользящее окно — в схеме нет истории по датам для
+    честного "20 подряд", тот же компромисс, что в `ComputeScore`,
+    Шаг 15).
+  - `MULTI_SPORT` — `SportRating.GamesPlayed > 0` у пользователя для 2+
+    разных видов спорта (реально сыграл, не просто добавил вид спорта в
+    профиль — иначе достижение обесценивается).
+- **Уведомление** — `NotificationType.AchievementEarned`, **новое
+  значение enum'а** (не было зарезервировано в Шаге 2, в отличие от
+  `MvpVoteOpen`/`ResultPosted`). Обоснованно: `NotificationType` хранится
+  строкой в БД (`HasConversion<string>()`), добавление значения — не
+  breaking change, миграция не нужна; комментарий в `Enums.cs`
+  ("Причина: в этом домене enum'ы будут активно расти") — прямая
+  санкция на такое расширение.
+- **Лента** — `ActivityVerb.EarnedAchievement` (уже в enum'е), тот же
+  gate, что `AddedSport` в Шаге 13: эмитится только если
+  `User.ProfileVisibility == Public`. Код ачивки кладём в
+  `Activity.Payload` (jsonb, `{"achievementCode": "..."}") — под это и
+  задумано поле, отдельной колонки не заводить.
+- `ActivityService.EmitAsync` — добавить необязательный параметр
+  `Dictionary<string,object>? payload = null` (обратная совместимость,
+  существующие вызовы не трогать).
+- **Чтение** — `MeProfileDto`/`PublicProfileDto` получают `List<AchievementDto>
+  Achievements` (только полученные, `EarnedAt` всегда заполнен). Отдельный
+  `GET /api/me/achievements` — полный каталог (все 7, `EarnedAt: null` у
+  ещё не полученных) — витрина "получено/не получено" для страницы
+  трофеев, публичный профиль такое не показывает (не хочет светить, чего
+  человек не достиг).
+
+#### Фаза 16.1 — Backend: AchievementService + wiring
+
+- `Features/Reputation/AchievementDtos.cs`: `AchievementDto(string Code,
+  string Name, string? Description, string? Icon, int Tier, DateTime?
+  EarnedAt)`.
+- `Features/Reputation/AchievementService.cs`: `CheckAndAwardAsync` (логика
+  выше), `GetMyAchievementsAsync(userId, locale, ct)` — полный каталог с
+  `EarnedAt` из `UserAchievements` (null, если нет).
+- `Domain/Enums.cs`: `NotificationType.AchievementEarned`.
+- `NotificationService.WiredTypes` — добавить (первый реальный вызов).
+- `ActivityService.EmitAsync` — необязательный `payload`.
+- `RatingService.ApplyResultAsync` — зовёт `achievementService
+  .CheckAndAwardAsync(userId, eventId, ct)` для каждого участника после
+  апдейта его `SportRating`/`ReliabilityStat`.
+- `Features/Reputation/ReputationEndpoints.cs`: `GET
+  /api/me/achievements`, `.RequireAuthorization()`.
+- `Program.cs`: `AddScoped<AchievementService>()`.
+
+#### Фаза 16.2 — Backend: чтение в профиле
+
+- `ProfileDtos.cs`: `MeProfileDto`/`PublicProfileDto` — добавить
+  `Achievements: List<AchievementDto>`.
+- `ProfileEndpoints.cs` — подтянуть полученные ачивки при маппинге
+  (join `UserAchievements`+`Achievement`, резолв `NameI18n`/`DescI18n`
+  по локали).
+
+#### Фаза 16.3 — Frontend
+
+- `reputationApi.ts` — `getMyAchievements`.
+- `authApi.ts` — `Achievement`-тип, `achievements` в `MeProfile`.
+- `/me` (`MeView.tsx`) — бейджи полученных ачивок, ссылка на
+  `/me/achievements`.
+- `/[handle]` — бейджи полученных ачивок (через `additionalData`, тот же
+  Kiota-приём, что рейтинг/подписчики в Шагах 13/15).
+- `/me/achievements` (новый маршрут) — витрина всех 7: получено — иконка
+  + дата, не получено — иконка приглушена + описание условия.
+- i18n: только текст страницы-витрины (`Reputation.achievements*` или в
+  `Me`-namespace — решить по месту), названия/описания самих ачивок уже
+  локализованы на бэкенде.
+
+#### Фаза 16.4 — Сборка и проверка
+
+- `dotnet build`/`dotnet test`, `pnpm --filter web run build`, `pnpm run
+  lint`.
+- В браузере не проверялось — тот же disclaimer, что в Шагах 13-15.
+
 ---
 
 ## 9. Конвенции
