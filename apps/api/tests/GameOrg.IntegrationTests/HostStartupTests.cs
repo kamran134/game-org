@@ -11,11 +11,16 @@ namespace GameOrg.IntegrationTests;
 /// эндпоинтов эагерли при первом построении AuthorizationPolicyCache.
 /// dotnet build и юнит-тесты этого не ловят: сборка типизирована корректно,
 /// ошибка чисто рантаймовая. Нужен живой Postgres — Hangfire подключается
-/// к БД уже при builder.Build(), до всякой миграции/сидинга.
+/// к БД уже при builder.Build(), до всякой миграции/сидинга. Образ —
+/// postgis/postgis, как в compose.dev.yml: миграции используют geography-
+/// колонки (NetTopologySuite), на голом postgres упадут на CREATE EXTENSION.
+/// WebApplicationFactory по умолчанию поднимает хост в Development —
+/// значит AutoMigrate=true обязателен, иначе сидинг (Program.cs) упадёт
+/// на несуществующих таблицах раньше, чем успеем проверить сам старт.
 /// </summary>
 public sealed class HostStartupTests : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _db = new PostgreSqlBuilder("postgres:17-alpine").Build();
+    private readonly PostgreSqlContainer _db = new PostgreSqlBuilder("postgis/postgis:17-3.5-alpine").Build();
 
     public Task InitializeAsync() => _db.StartAsync();
 
@@ -29,6 +34,7 @@ public sealed class HostStartupTests : IAsyncLifetime
             {
                 ["ConnectionStrings:Default"] = _db.GetConnectionString(),
                 ["JWT_SIGNING_KEY"] = "test_signing_key_min_32_characters_long_ok",
+                ["AutoMigrate"] = "true",
             })));
 
         using var client = factory.CreateClient();
