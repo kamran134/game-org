@@ -87,14 +87,32 @@ export async function loginWithTelegram(apiUrl: string, locale: string, telegram
   return res.json();
 }
 
+// Каждая секция страницы события (Payments, Teams, MVP, Report, ...) сама
+// вызывает fetchMe при монтировании — без этого при одном визите на страницу
+// улетает по отдельному GET /api/me на секцию. Делим один и тот же промис
+// между всеми, кто позвал fetchMe, пока первый вызов ещё не завершился.
+let inFlight: { key: string; promise: Promise<MeProfile | null> } | null = null;
+
 export async function fetchMe(apiUrl: string, locale: string): Promise<MeProfile | null> {
-  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/me`, {
-    credentials: "include",
-    headers: localeHeaders(locale),
-  });
-  if (res.status === 401) return null;
-  if (!res.ok) throw new Error(`Не удалось получить профиль (${res.status})`);
-  return res.json();
+  const key = `${apiUrl}|${locale}`;
+  if (inFlight?.key === key) return inFlight.promise;
+
+  const promise = (async () => {
+    const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/me`, {
+      credentials: "include",
+      headers: localeHeaders(locale),
+    });
+    if (res.status === 401) return null;
+    if (!res.ok) throw new Error(`Не удалось получить профиль (${res.status})`);
+    return res.json();
+  })();
+
+  inFlight = { key, promise };
+  try {
+    return await promise;
+  } finally {
+    if (inFlight?.promise === promise) inFlight = null;
+  }
 }
 
 export type UpdateMeRequest = Partial<{
