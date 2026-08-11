@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using GameOrg.Api.Features.Clubs;
 using GameOrg.Api.Features.Events;
 using GameOrg.Api.Features.Geography;
 using GameOrg.Api.Features.Identity;
@@ -84,6 +85,7 @@ builder.Services.AddScoped<EventService>();
 builder.Services.AddScoped<AuditLogService>();
 builder.Services.AddScoped<ReportService>();
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<ClubService>();
 
 builder.Services.AddHttpClient<TelegramSender>();
 builder.Services.AddScoped<NotificationSender>();
@@ -208,6 +210,7 @@ app.MapVenuesEndpoints();
 app.MapEventsEndpoints();
 app.MapModerationEndpoints();
 app.MapNotificationsEndpoints();
+app.MapClubsEndpoints();
 
 app.Run();
 

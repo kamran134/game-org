@@ -1030,8 +1030,11 @@ enum'а:**
 - `Features/Clubs/ClubsEndpoints.cs`: `GET /api/clubs`, `GET
   /api/clubs/{slug}`, `POST /api/clubs`, `PATCH /api/clubs/{id}`, `DELETE
   /api/clubs/{id}` — по образцу `VenuesEndpoints.cs`.
-- Фото (avatar/cover) — тот же `R2StorageService`/presign-flow, что у
-  площадок в Шаге 7, без нового кода в сторадж-слое.
+- Фото (avatar/cover) — **вне охвата Шага 12**, пересмотрено по ходу: поля
+  `AvatarId`/`CoverId` в домене остаются, но отдельный presign/attach-флоу
+  под них — не основная часть «приватных групп», раздувает шаг. `MediaAsset`
+  никуда не убегает, можно добавить отдельным заходом по образцу фото
+  площадок из Шага 7.
 
 #### Фаза 12.3 — Backend: участники
 
