@@ -1578,6 +1578,104 @@ Payments — деньги решили отложить до выбора про
   lint`.
 - В браузере не проверялось — тот же disclaimer, что в Шагах 13-15.
 
+### Шаг 17 — Web Push (DeviceToken)
+
+Домен готов с Шага 2 (`DeviceToken`, `NotificationChannel.Push`,
+`DevicePlatform{Ios,Android,Web}`), кода нет — явно вынесено «вне охвата»
+в Шаге 11 (§11.2: «Push — вне охвата, отдельная инфраструктура (VAPID,
+service worker)»). Выбор пользователя — Web Push, третий канал доставки
+после InApp/Telegram (Шаг 11).
+
+**Решения по умолчанию (не вопрос пользователю):**
+
+- **Только `DevicePlatform.Web`** (обычный Web Push API браузера, VAPID).
+  `Ios`/`Android` остаются в enum'е под нативные push (FCM/APNs) — другая
+  инфраструктура, другой SDK, не входит в объём.
+- **`DeviceToken.Token` хранит целиком `PushSubscription` в JSON**
+  (`{endpoint, keys:{p256dh, auth}}`) — Web Push API отдаёт объект
+  подписки, не строку-токен (в отличие от FCM/APNs). Заводить отдельные
+  колонки под `endpoint`/`p256dh`/`auth` — лишняя миграция ради того же
+  результата, который уже даёт единственное `Token`-поле; десериализуем
+  на отправке.
+- **NuGet-пакет `WebPush`** (VAPID-подпись, отправка) — тот же паттерн,
+  что `AWSSDK.S3` в Шаге 7.
+- **VAPID-ключи** — новые переменные окружения `VAPID_PUBLIC_KEY`/
+  `VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` (`mailto:` или URL). Публичный ключ
+  фронту не льём отдельной `NEXT_PUBLIC_`-переменной — отдаём с бэкенда
+  через `GET /api/push/vapid-public-key` (один источник правды, не нужно
+  пересобирать фронт при смене ключа). Как и с Telegram-ботом/R2 (Шаги
+  5, 7) — генерация реальных ключей и жизнь в GitHub Secrets — ручной шаг
+  пользователя, не могу сделать сам за пределами локальной разработки.
+- **`NotificationSender.SendPushAsync`** — по образцу `SendTelegramAsync`:
+  одна запись `Notification(Channel=Push)` на `(user, dedupeKey)`
+  (уникальность в БД — на пару, не на устройство), но реально шлёт на
+  **все** `DeviceToken` пользователя с `Platform=Web` — статус записи
+  агрегированный (`Sent`, если хоть одно устройство приняло; `Failed`,
+  если все отвалились). Протухшая подписка (410/404 от push-сервиса) —
+  сразу удаляется из `DeviceTokens`, самоочистка без отдельного воркера.
+- **Настройки уведомлений — обобщение, не дублирование.** У
+  `NotificationService.GetPreferencesAsync`/`SetPreferenceAsync` уже
+  зашит `NotificationChannel.Telegram` — параметризуем каналом (значение
+  по умолчанию `Telegram`, чтобы не сломать существующий фронт), Push
+  получает те же переключатели по тем же `WiredTypes`, без нового
+  списка типов.
+
+#### Фаза 17.1 — Backend: инфраструктура
+
+- `GameOrg.Infrastructure.csproj`: пакет `WebPush`.
+- `Infrastructure/Notifications/WebPushSender.cs` (по образцу
+  `TelegramSender.cs`) — `TrySendAsync(DeviceToken device, string title,
+  string body, CancellationToken ct) → (bool Sent, bool Expired)` —
+  `Expired=true` на 404/410 от push-сервиса, вызывающий код сам решает
+  удалить токен.
+- `Program.cs`: `AddSingleton<WebPushSender>()`, конфиг `VAPID_PUBLIC_KEY`/
+  `VAPID_PRIVATE_KEY`/`VAPID_SUBJECT` из плоских env-переменных.
+- `.env.example`, `infra/compose.dev.yml`/`compose.prod.yml` — три новые
+  переменные.
+
+#### Фаза 17.2 — Backend: отправка и управление устройствами
+
+- `NotificationSender.SendPushAsync` — логика выше, встроить в общий
+  `SendAsync` (третий вызов рядом с `SendInAppAsync`/`SendTelegramAsync`).
+- `NotificationService.GetPreferencesAsync`/`SetPreferenceAsync` —
+  добавить параметр `NotificationChannel channel = NotificationChannel
+  .Telegram`.
+- `Features/Notifications/DeviceDtos.cs`: `RegisterDeviceRequest(string
+  Token, string? Locale)`.
+- `Features/Notifications/DeviceService.cs`: `RegisterAsync` (upsert по
+  `Token` — переподписка не плодит дубликат, обновляет `LastSeenAt`),
+  `UnregisterAsync(userId, token, ct)`.
+- `NotificationsEndpoints.cs`: `GET /api/push/vapid-public-key`
+  (анонимный), `POST /api/me/devices`, `DELETE /api/me/devices` (по
+  токену в теле — простой девайс себя же и отписывает), оба
+  `.RequireAuthorization()`. `GET/PUT /api/me/notification-preferences`
+  — добавить необязательный query `channel`.
+- `Program.cs`: `AddScoped<DeviceService>()`.
+
+#### Фаза 17.3 — Frontend
+
+- `public/sw.js` — минимальный service worker: слушает `push` (парсит
+  JSON пейлоад, `self.registration.showNotification`), `notificationclick`
+  (`clients.openWindow` на URL из данных).
+- `pushApi.ts` — `getVapidPublicKey`, `registerDevice`, `unregisterDevice`.
+- `/me/notifications` (`NotificationPreferences.tsx`, уже существует с
+  Шага 11) — новая секция «Push-уведомления в браузере»: кнопка
+  «Включить» → регистрация service worker → `Notification.requestPermission()`
+  → `pushManager.subscribe({applicationServerKey})` → `registerDevice`;
+  «Выключить» → `pushManager.getSubscription().unsubscribe()` +
+  `unregisterDevice`. Плюс те же переключатели по типам, что у Telegram,
+  но с `channel=Push`.
+- i18n: `Notifications.push*`.
+
+#### Фаза 17.4 — Сборка и проверка
+
+- `dotnet build`/`dotnet test`, `pnpm --filter web run build`, `pnpm run
+  lint`.
+- Без реальных VAPID-ключей и HTTPS (Web Push требует either localhost,
+  either HTTPS) сквозной приём push в браузере не проверить — тот же
+  честный disclaimer, что был с R2/ботом в своё время: код готов, ждёт
+  секретов и реального деплоя.
+
 ---
 
 ## 9. Конвенции
