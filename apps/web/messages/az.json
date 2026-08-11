@@ -213,6 +213,9 @@
     "deleting": "Silinir…",
     "deleteConfirm": "Tədbiri silmək istəyirsiniz? Bu əməliyyat geri qaytarılmır.",
     "deleteError": "Tədbir silinmədi",
+    "completeEvent": "Tədbiri tamamla",
+    "completing": "Tamamlanır…",
+    "completeError": "Tədbiri tamamlamaq mümkün olmadı",
     "spotsLeft": "Boş yer: {count}",
     "full": "Yer yoxdur",
     "waitlistCount": "Növbədə: {count}",
@@ -287,7 +290,44 @@
     "cancelEvent": "Tədbiri ləğv et",
     "cancelConfirm": "Tədbiri ləğv etmək istədiyinizə əminsiniz? İştirakçılara bildiriş gedəcək.",
     "cancelError": "Tədbir ləğv edilmədi",
-    "eventCancelledNotice": "Bu tədbir ləğv edilib."
+    "eventCancelledNotice": "Bu tədbir ləğv edilib.",
+    "teams": {
+      "heading": "Komandalar",
+      "edit": "Komandaları dəyiş",
+      "setUp": "Komandaları qur",
+      "none": "Komanda təyin edilməyib.",
+      "noMembers": "Heç kim yoxdur",
+      "newTeamName": "Komanda {count}",
+      "addTeam": "Komanda əlavə et",
+      "remove": "Sil",
+      "save": "Yadda saxla",
+      "saving": "Yadda saxlanılır…",
+      "cancel": "Ləğv et",
+      "saveError": "Komandaları yadda saxlamaq mümkün olmadı"
+    },
+    "mvp": {
+      "heading": "MVP",
+      "votesCount": "{count} səs",
+      "voteError": "Səs vermək mümkün olmadı",
+      "badge": "MVP: {name}"
+    },
+    "result": {
+      "heading": "Nəticə",
+      "editHeading": "Nəticəni redaktə et",
+      "recordHeading": "Nəticəni yaz",
+      "summary": "Təsvir",
+      "teamScores": "Komandalar üzrə hesab",
+      "standings": "Sıralama",
+      "placePlaceholder": "Yer",
+      "attendance": "İştirak",
+      "attendanceUnset": "— qeyd etmə —",
+      "mvp": "MVP",
+      "mvpAuto": "Avtomatik (səslərə görə: {name})",
+      "mvpNone": "Seçilməyib",
+      "save": "Nəticəni yadda saxla",
+      "saving": "Yadda saxlanılır…",
+      "saveError": "Nəticəni yazmaq mümkün olmadı"
+    }
   },
   "Moderation": {
     "pageTitle": "Moderasiya növbəsi",

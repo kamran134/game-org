@@ -213,6 +213,9 @@
     "deleting": "Deleting…",
     "deleteConfirm": "Delete this event? This cannot be undone.",
     "deleteError": "Failed to delete event",
+    "completeEvent": "Complete event",
+    "completing": "Completing…",
+    "completeError": "Failed to complete event",
     "spotsLeft": "{count} spots left",
     "full": "Full",
     "waitlistCount": "Waitlist: {count}",
@@ -287,7 +290,44 @@
     "cancelEvent": "Cancel event",
     "cancelConfirm": "Cancel this event? Participants will be notified.",
     "cancelError": "Failed to cancel event",
-    "eventCancelledNotice": "This event has been cancelled."
+    "eventCancelledNotice": "This event has been cancelled.",
+    "teams": {
+      "heading": "Teams",
+      "edit": "Edit teams",
+      "setUp": "Set up teams",
+      "none": "No teams set up yet.",
+      "noMembers": "No one yet",
+      "newTeamName": "Team {count}",
+      "addTeam": "Add team",
+      "remove": "Remove",
+      "save": "Save",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "saveError": "Failed to save teams"
+    },
+    "mvp": {
+      "heading": "MVP",
+      "votesCount": "{count} votes",
+      "voteError": "Failed to vote",
+      "badge": "MVP: {name}"
+    },
+    "result": {
+      "heading": "Result",
+      "editHeading": "Edit result",
+      "recordHeading": "Record result",
+      "summary": "Summary",
+      "teamScores": "Team scores",
+      "standings": "Standings",
+      "placePlaceholder": "Place",
+      "attendance": "Attendance",
+      "attendanceUnset": "— leave unset —",
+      "mvp": "MVP",
+      "mvpAuto": "Auto (by votes: {name})",
+      "mvpNone": "None selected",
+      "save": "Save result",
+      "saving": "Saving…",
+      "saveError": "Failed to record result"
+    }
   },
   "Moderation": {
     "pageTitle": "Moderation queue",

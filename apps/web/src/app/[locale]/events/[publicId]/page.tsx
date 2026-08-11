@@ -6,6 +6,9 @@ import { Link } from "@/i18n/navigation";
 import { getEvent } from "@/lib/eventsApi";
 import { ParticipantsSection } from "./ParticipantsSection";
 import { EventActions } from "./EventActions";
+import { TeamsSection } from "./TeamsSection";
+import { MvpVoteSection } from "./MvpVoteSection";
+import { RecordResultSection } from "./RecordResultSection";
 import { ReportButton } from "@/components/ReportButton";
 
 export const dynamic = "force-dynamic";
@@ -110,6 +113,16 @@ export default async function EventPage({ params }: { params: Promise<{ locale: 
             </p>
           )}
 
+          {event.result && (
+            <div className="mt-4 rounded-xl border border-brand-border bg-brand-muted/40 p-4">
+              <p className="text-sm font-medium text-foreground">{t("result.heading")}</p>
+              {event.result.summary && <p className="mt-1 text-sm text-foreground/80">{event.result.summary}</p>}
+              {event.result.mvpDisplayName && (
+                <p className="mt-2 text-sm text-foreground/70">{t("mvp.badge", { name: event.result.mvpDisplayName })}</p>
+              )}
+            </div>
+          )}
+
           <div className="mt-6 flex flex-wrap items-center gap-4">
             <Link href={`/events/${event.publicId}/edit`} className="text-sm font-medium text-brand-primary hover:underline">
               {t("editEvent")}
@@ -117,10 +130,13 @@ export default async function EventPage({ params }: { params: Promise<{ locale: 
             <ReportButton apiUrl={apiUrl} targetType="Event" targetId={event.id} />
           </div>
 
-          <EventActions apiUrl={apiUrl} eventId={event.id} createdById={event.createdById} />
+          <EventActions apiUrl={apiUrl} eventId={event.id} createdById={event.createdById} status={event.status} endsAt={event.endsAt} />
         </div>
 
         <ParticipantsSection apiUrl={apiUrl} locale={locale} event={event} />
+        <TeamsSection apiUrl={apiUrl} locale={locale} event={event} />
+        <MvpVoteSection apiUrl={apiUrl} event={event} />
+        <RecordResultSection apiUrl={apiUrl} locale={locale} event={event} />
       </div>
     </main>
   );

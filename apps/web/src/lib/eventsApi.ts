@@ -53,6 +53,26 @@ export type EventParticipant = {
   joinedAt: string;
 };
 
+export type EventTeam = {
+  id: string;
+  name: string;
+  colorHex?: string | null;
+  score?: number | null;
+  sortOrder: number;
+  memberParticipantIds: string[];
+};
+
+export type EventResult = {
+  summary?: string | null;
+  standings?: Record<string, unknown>[] | null;
+  mvpUserId?: string | null;
+  mvpDisplayName?: string | null;
+  recordedById?: string | null;
+  recordedAt: string;
+};
+
+export type MvpTallyEntry = { userId: string; displayName: string; votes: number };
+
 export type EventDetail = {
   id: string;
   publicId: string;
@@ -89,6 +109,10 @@ export type EventDetail = {
   cancelledAt?: string | null;
   cancelReason?: string | null;
   participants: EventParticipant[];
+  teams: EventTeam[];
+  result?: EventResult | null;
+  mvpTally: MvpTallyEntry[];
+  myMvpVote?: string | null;
   // Резолвнутые title/description выше — для страницы просмотра. Эти два —
   // сырые словари по всем языкам, только для формы редактирования.
   titleI18n?: LocalizedText | null;
@@ -123,6 +147,21 @@ export type CreateEventRequest = {
 
 // SportId/ClubId/Type осознанно неизменяемы после создания (см. UpdateEventRequest на бэкенде).
 export type UpdateEventRequest = Partial<Omit<CreateEventRequest, "type" | "sportId" | "clubId">>;
+
+export type TeamInput = { name: string; colorHex?: string | null; sortOrder: number; participantIds: string[] };
+export type SetTeamsRequest = { teams: TeamInput[] };
+
+export type StandingEntry = { userId: string; place: number; score?: number | null };
+export type TeamScoreEntry = { teamId: string; score: number };
+export type AttendanceStatus = "Attended" | "NoShow" | "LateCancel";
+export type AttendanceEntry = { participantId: string; status: AttendanceStatus };
+export type RecordResultRequest = {
+  summary?: string | null;
+  standings?: StandingEntry[] | null;
+  teamScores?: TeamScoreEntry[] | null;
+  attendance?: AttendanceEntry[] | null;
+  mvpUserId?: string | null;
+};
 
 function apiBase(apiUrl: string): string {
   return apiUrl.replace(/\/api\/?$/, "");
@@ -246,4 +285,43 @@ export async function cancelEvent(apiUrl: string, locale: string, eventId: strin
     body: JSON.stringify({ reason: reason ?? null }),
   });
   if (!res.ok) throw new Error(await errorMessage(res, `Не удалось отменить событие (${res.status})`));
+}
+
+export async function completeEvent(apiUrl: string, locale: string, eventId: string): Promise<void> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/events/${eventId}/complete`, {
+    method: "POST",
+    credentials: "include",
+    headers: localeHeaders(locale),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Не удалось завершить событие (${res.status})`));
+}
+
+export async function setEventTeams(apiUrl: string, locale: string, eventId: string, body: SetTeamsRequest): Promise<void> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/events/${eventId}/teams`, {
+    method: "PUT",
+    credentials: "include",
+    headers: localeHeaders(locale, { "Content-Type": "application/json" }),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Не удалось сохранить команды (${res.status})`));
+}
+
+export async function voteMvp(apiUrl: string, locale: string, eventId: string, targetUserId: string): Promise<void> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/events/${eventId}/mvp-vote`, {
+    method: "POST",
+    credentials: "include",
+    headers: localeHeaders(locale, { "Content-Type": "application/json" }),
+    body: JSON.stringify({ targetUserId }),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Не удалось проголосовать (${res.status})`));
+}
+
+export async function recordResult(apiUrl: string, locale: string, eventId: string, body: RecordResultRequest): Promise<void> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/events/${eventId}/result`, {
+    method: "POST",
+    credentials: "include",
+    headers: localeHeaders(locale, { "Content-Type": "application/json" }),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res, `Не удалось записать результат (${res.status})`));
 }

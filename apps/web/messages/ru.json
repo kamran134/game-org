@@ -213,6 +213,9 @@
     "deleting": "Удаляю…",
     "deleteConfirm": "Удалить событие? Это действие нельзя отменить.",
     "deleteError": "Не удалось удалить событие",
+    "completeEvent": "Завершить событие",
+    "completing": "Завершаю…",
+    "completeError": "Не удалось завершить событие",
     "spotsLeft": "Свободно: {count}",
     "full": "Мест нет",
     "waitlistCount": "В очереди: {count}",
@@ -287,7 +290,44 @@
     "cancelEvent": "Отменить событие",
     "cancelConfirm": "Точно отменить событие? Участники получат уведомление.",
     "cancelError": "Не удалось отменить событие",
-    "eventCancelledNotice": "Это событие отменено."
+    "eventCancelledNotice": "Это событие отменено.",
+    "teams": {
+      "heading": "Команды",
+      "edit": "Изменить команды",
+      "setUp": "Настроить команды",
+      "none": "Команды не заданы.",
+      "noMembers": "Никого нет",
+      "newTeamName": "Команда {count}",
+      "addTeam": "Добавить команду",
+      "remove": "Убрать",
+      "save": "Сохранить",
+      "saving": "Сохраняю…",
+      "cancel": "Отмена",
+      "saveError": "Не удалось сохранить команды"
+    },
+    "mvp": {
+      "heading": "MVP",
+      "votesCount": "{count} голосов",
+      "voteError": "Не удалось проголосовать",
+      "badge": "MVP: {name}"
+    },
+    "result": {
+      "heading": "Результат",
+      "editHeading": "Редактировать результат",
+      "recordHeading": "Записать результат",
+      "summary": "Описание",
+      "teamScores": "Счёт по командам",
+      "standings": "Расстановка",
+      "placePlaceholder": "Место",
+      "attendance": "Явка",
+      "attendanceUnset": "— не отмечать —",
+      "mvp": "MVP",
+      "mvpAuto": "Авто (по голосам: {name})",
+      "mvpNone": "Не выбран",
+      "save": "Сохранить результат",
+      "saving": "Сохраняю…",
+      "saveError": "Не удалось записать результат"
+    }
   },
   "Moderation": {
     "pageTitle": "Очередь модерации",
