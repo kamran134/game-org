@@ -1,6 +1,7 @@
 using GameOrg.Api.Common;
 using GameOrg.Api.Features.Geography;
 using GameOrg.Api.Features.Moderation;
+using GameOrg.Api.Features.Social;
 using GameOrg.Api.Features.Sports;
 using GameOrg.Domain;
 using GameOrg.Domain.Entities;
@@ -12,7 +13,8 @@ using NetTopologySuite.Geometries;
 namespace GameOrg.Api.Features.Venues;
 
 /// <summary>CRUD площадок, фото (через R2) и отзывы.</summary>
-public sealed class VenueService(GameOrgDbContext db, R2StorageService storage, AuditLogService auditLog)
+public sealed class VenueService(
+    GameOrgDbContext db, R2StorageService storage, AuditLogService auditLog, FollowService followService, ActivityService activityService)
 {
     public async Task<(Venue? Result, string? Error)> CreateAsync(Guid userId, UserRole creatorRole, CreateVenueRequest request, CancellationToken ct)
     {
@@ -141,7 +143,9 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage, 
         if (venue is null) return null;
         if (venue.Status == VenueStatus.Draft && venue.CreatedById != viewerId && !viewerIsModerator) return null;
 
-        return MapDetail(venue, locale);
+        var followersCount = await followService.CountFollowersAsync(FollowTargetType.Venue, venue.Id, ct);
+        var viewerIsFollowing = await followService.IsFollowingAsync(viewerId, FollowTargetType.Venue, venue.Id, ct);
+        return MapDetail(venue, locale, followersCount, viewerIsFollowing);
     }
 
     /// <summary>Только модератор/админ — очередь площадок, ожидающих премодерации.</summary>
@@ -245,7 +249,7 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage, 
         return (true, null);
     }
 
-    private VenueDetailDto MapDetail(Venue venue, string locale) => new(
+    private VenueDetailDto MapDetail(Venue venue, string locale, int followersCount, bool viewerIsFollowing) => new(
         venue.Id, venue.Slug,
         Localized.Resolve(venue.NameI18n, locale) ?? "",
         Localized.Resolve(venue.DescriptionI18n, locale),
@@ -256,6 +260,7 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage, 
         venue.HasLighting, venue.HasShowers, venue.HasParking, venue.HasTribunes,
         venue.PriceHint, venue.Currency, venue.Phone, venue.Website, venue.OpeningHours,
         venue.RatingAvg, venue.RatingCount, venue.EventsCount, venue.CreatedById, venue.Status,
+        followersCount, viewerIsFollowing,
         venue.Sports.Select(s => new VenueSportDto(
             new SportDto(s.Sport.Id, s.Sport.Slug, s.Sport.NameI18n, s.Sport.Emoji, s.Sport.HasPositions, s.Sport.IsTeamSport),
             s.Courts)).ToList(),
@@ -374,8 +379,8 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage, 
         if (request.Rating is < 1 or > 5)
             return (null, "Оценка должна быть от 1 до 5.", false);
 
-        var venueExists = await db.Venues.AnyAsync(v => v.Id == venueId, ct);
-        if (!venueExists) return (null, "Площадка не найдена.", false);
+        var venue = await db.Venues.FirstOrDefaultAsync(v => v.Id == venueId, ct);
+        if (venue is null) return (null, "Площадка не найдена.", false);
 
         var alreadyReviewed = await db.VenueReviews.AnyAsync(r => r.VenueId == venueId && r.AuthorId == userId, ct);
         if (alreadyReviewed) return (null, "Вы уже оставляли отзыв на эту площадку.", true);
@@ -384,6 +389,9 @@ public sealed class VenueService(GameOrgDbContext db, R2StorageService storage, 
         db.VenueReviews.Add(review);
         await db.SaveChangesAsync(ct);
         await RecomputeRatingAsync(venueId, ct);
+
+        if (venue.Status == VenueStatus.Published)
+            await activityService.EmitAsync(userId, ActivityVerb.ReviewedVenue, null, null, venueId, null, ct);
 
         var author = await db.Users.FirstAsync(u => u.Id == userId, ct);
         return (new VenueReviewDto(review.Id, userId, Localized.Resolve(author.DisplayNameI18n, locale) ?? "", review.Rating, review.Text, review.CreatedAt, review.UpdatedAt), null, false);

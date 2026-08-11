@@ -65,3 +65,6 @@ public enum MediaKind { Image, Video }
 public enum ReportReason { Spam, Abuse, FakeProfile, WrongInfo, InappropriateContent, Other }
 
 public enum ReportStatus { Open, InReview, Resolved, Rejected }
+
+/// <summary>API-only дискриминатор для полиморфного Follow (в таблице — три nullable FK, не эта колонка).</summary>
+public enum FollowTargetType { User, Club, Venue }

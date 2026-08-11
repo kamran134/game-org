@@ -28,6 +28,8 @@ public sealed record ClubDetailDto(
     string? InviteCode,
     ClubRole? ViewerRole,
     MembershipStatus? ViewerStatus,
+    int FollowersCount,
+    bool ViewerIsFollowing,
     List<SportDto> Sports,
     // Резолвнутые Name/Description выше — для страницы просмотра. Эти два —
     // сырые словари по всем языкам, нужны только форме редактирования.

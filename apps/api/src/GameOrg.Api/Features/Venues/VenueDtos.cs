@@ -54,6 +54,8 @@ public sealed record VenueDetailDto(
     int EventsCount,
     Guid? CreatedById,
     VenueStatus Status,
+    int FollowersCount,
+    bool ViewerIsFollowing,
     List<VenueSportDto> Sports,
     List<VenuePhotoDto> Photos,
     // Резолвнутые Name/Description/Address выше — для страницы просмотра.

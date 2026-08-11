@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using GameOrg.Api.Common;
 using GameOrg.Api.Features.Geography;
+using GameOrg.Api.Features.Social;
 using GameOrg.Api.Features.Sports;
 using GameOrg.Domain;
 using GameOrg.Domain.Entities;
@@ -11,7 +12,8 @@ using Microsoft.EntityFrameworkCore;
 namespace GameOrg.Api.Features.Clubs;
 
 /// <summary>CRUD клубов и управление участниками.</summary>
-public sealed class ClubService(GameOrgDbContext db, NotificationSender notificationSender)
+public sealed class ClubService(
+    GameOrgDbContext db, NotificationSender notificationSender, FollowService followService, ActivityService activityService)
 {
     public async Task<(Club? Result, string? Error)> CreateAsync(Guid userId, CreateClubRequest request, CancellationToken ct)
     {
@@ -42,6 +44,10 @@ public sealed class ClubService(GameOrgDbContext db, NotificationSender notifica
 
         db.Clubs.Add(club);
         await db.SaveChangesAsync(ct);
+
+        if (club.Visibility != ClubVisibility.Private)
+            await activityService.EmitAsync(userId, ActivityVerb.CreatedClub, null, club.Id, null, null, ct);
+
         return (club, null);
     }
 
@@ -99,7 +105,9 @@ public sealed class ClubService(GameOrgDbContext db, NotificationSender notifica
         var viewerIsActive = viewerMembership is { Status: MembershipStatus.Active };
         if (club.Visibility == ClubVisibility.Private && !viewerIsActive) return null;
 
-        return MapDetail(club, locale, viewerMembership);
+        var followersCount = await followService.CountFollowersAsync(FollowTargetType.Club, club.Id, ct);
+        var viewerIsFollowing = await followService.IsFollowingAsync(viewerId, FollowTargetType.Club, club.Id, ct);
+        return MapDetail(club, locale, viewerMembership, followersCount, viewerIsFollowing);
     }
 
     public async Task<List<ClubDto>> GetListAsync(string locale, Guid? viewerId, Guid? cityId, Guid? sportId, CancellationToken ct)
@@ -188,6 +196,7 @@ public sealed class ClubService(GameOrgDbContext db, NotificationSender notifica
         if (status == MembershipStatus.Active)
         {
             await RecomputeMembersCountAsync(clubId, ct);
+            await activityService.EmitAsync(userId, ActivityVerb.JoinedClub, null, clubId, null, null, ct);
         }
         else
         {
@@ -265,6 +274,9 @@ public sealed class ClubService(GameOrgDbContext db, NotificationSender notifica
         member.JoinedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
         await RecomputeMembersCountAsync(clubId, ct);
+        // RequestOnly — единственный путь сюда (Public вступает сразу через JoinAsync,
+        // Private вообще не имеет заявок), значит Visibility != Private гарантирован.
+        await activityService.EmitAsync(targetUserId, ActivityVerb.JoinedClub, null, clubId, null, null, ct);
         return (true, null);
     }
 
@@ -437,7 +449,7 @@ public sealed class ClubService(GameOrgDbContext db, NotificationSender notifica
     public Task<bool> IsActiveMemberAsync(Guid clubId, Guid userId, CancellationToken ct) =>
         db.ClubMembers.AnyAsync(m => m.ClubId == clubId && m.UserId == userId && m.Status == MembershipStatus.Active, ct);
 
-    private ClubDetailDto MapDetail(Club club, string locale, ClubMember? viewerMembership)
+    private ClubDetailDto MapDetail(Club club, string locale, ClubMember? viewerMembership, int followersCount, bool viewerIsFollowing)
     {
         var viewerIsManager = viewerMembership is { Status: MembershipStatus.Active } && viewerMembership.Role is ClubRole.Owner or ClubRole.Admin;
 
@@ -448,6 +460,7 @@ public sealed class ClubService(GameOrgDbContext db, NotificationSender notifica
             MapCity(club.City), club.Visibility, club.MembersCount, club.EventsCount, club.CreatedById,
             viewerIsManager ? club.InviteCode : null,
             viewerMembership?.Role, viewerMembership?.Status,
+            followersCount, viewerIsFollowing,
             club.Sports.Select(s => new SportDto(s.Sport.Id, s.Sport.Slug, s.Sport.NameI18n, s.Sport.Emoji, s.Sport.HasPositions, s.Sport.IsTeamSport)).ToList(),
             LocalizedTextDto.From(club.NameI18n),
             LocalizedTextDto.FromNullable(club.DescriptionI18n));

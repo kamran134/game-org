@@ -1,6 +1,7 @@
 using GameOrg.Api.Common;
 using GameOrg.Api.Features.Clubs;
 using GameOrg.Api.Features.Moderation;
+using GameOrg.Api.Features.Social;
 using GameOrg.Api.Features.Sports;
 using GameOrg.Domain;
 using GameOrg.Domain.Entities;
@@ -11,7 +12,8 @@ using Microsoft.EntityFrameworkCore;
 namespace GameOrg.Api.Features.Events;
 
 /// <summary>CRUD событий, запись участников (с вейтлистом), отмена. Напоминания за 24ч/2ч — EventReminderJob.</summary>
-public sealed class EventService(GameOrgDbContext db, NotificationSender notificationSender, AuditLogService auditLog, ClubService clubService)
+public sealed class EventService(
+    GameOrgDbContext db, NotificationSender notificationSender, AuditLogService auditLog, ClubService clubService, ActivityService activityService)
 {
     public async Task<(Event? Result, string? Error)> CreateAsync(Guid userId, CreateEventRequest request, CancellationToken ct)
     {
@@ -54,6 +56,10 @@ public sealed class EventService(GameOrgDbContext db, NotificationSender notific
 
         db.Events.Add(ev);
         await db.SaveChangesAsync(ct);
+
+        if (ev.Visibility == EventVisibility.Public)
+            await activityService.EmitAsync(userId, ActivityVerb.CreatedEvent, ev.Id, null, null, null, ct);
+
         return (ev, null);
     }
 
@@ -201,6 +207,9 @@ public sealed class EventService(GameOrgDbContext db, NotificationSender notific
         db.EventParticipants.Add(participant);
         await db.SaveChangesAsync(ct);
         await RecomputeCountsAsync(eventId, ct);
+
+        if (status == ParticipationStatus.Confirmed && ev.Visibility == EventVisibility.Public)
+            await activityService.EmitAsync(userId, ActivityVerb.JoinedEvent, eventId, null, null, null, ct);
 
         if (ev.CreatedById is Guid creatorId && creatorId != userId)
         {

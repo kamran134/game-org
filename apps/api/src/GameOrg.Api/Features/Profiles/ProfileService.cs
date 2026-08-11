@@ -1,5 +1,7 @@
 using System.Text.RegularExpressions;
 using GameOrg.Api.Common;
+using GameOrg.Api.Features.Social;
+using GameOrg.Domain;
 using GameOrg.Domain.Entities;
 using GameOrg.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -7,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace GameOrg.Api.Features.Profiles;
 
 /// <summary>Управление профилем текущего пользователя: базовые поля + UserSport.</summary>
-public sealed partial class ProfileService(GameOrgDbContext db)
+public sealed partial class ProfileService(GameOrgDbContext db, ActivityService activityService)
 {
     /// <summary>Применяет непустые поля запроса. Error — null при успехе.</summary>
     public async Task<(string? Error, bool Conflict)> UpdateMeAsync(User user, UpdateMeRequest request, CancellationToken ct)
@@ -101,6 +103,7 @@ public sealed partial class ProfileService(GameOrgDbContext db)
             .Include(us => us.Positions)
             .FirstOrDefaultAsync(us => us.UserId == userId && us.SportId == sportId, ct);
 
+        var isNewSport = userSport is null;
         if (userSport is null)
         {
             userSport = new UserSport { UserId = userId, SportId = sportId };
@@ -128,6 +131,14 @@ public sealed partial class ProfileService(GameOrgDbContext db)
         }
 
         await db.SaveChangesAsync(ct);
+
+        if (isNewSport && request.Visibility == Visibility.Public)
+        {
+            var profileVisibility = await db.Users.Where(u => u.Id == userId).Select(u => u.ProfileVisibility).FirstAsync(ct);
+            if (profileVisibility == Visibility.Public)
+                await activityService.EmitAsync(userId, ActivityVerb.AddedSport, null, null, null, null, ct);
+        }
+
         return (userSport, null);
     }
 

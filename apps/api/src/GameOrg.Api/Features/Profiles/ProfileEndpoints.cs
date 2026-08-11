@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using GameOrg.Api.Common;
 using GameOrg.Api.Features.Geography;
+using GameOrg.Api.Features.Social;
 using GameOrg.Domain;
 using GameOrg.Domain.Entities;
 using GameOrg.Infrastructure;
@@ -13,13 +14,15 @@ public static class ProfileEndpoints
 {
     public static IEndpointRouteBuilder MapProfileEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/me", async (ClaimsPrincipal principal, HttpContext ctx, GameOrgDbContext db, CancellationToken ct) =>
+        app.MapGet("/api/me", async (ClaimsPrincipal principal, HttpContext ctx, GameOrgDbContext db, FollowService followService, CancellationToken ct) =>
         {
             var user = await LoadFullUserAsync(db, principal, ct);
             if (user is null) return Results.Unauthorized();
 
             var locale = RequestLocale.ResolveAndVary(ctx);
-            return Results.Ok(MapMe(user, locale));
+            var followersCount = await followService.CountFollowersAsync(FollowTargetType.User, user.Id, ct);
+            var followingCount = await followService.CountFollowingAsync(user.Id, ct);
+            return Results.Ok(MapMe(user, locale, followersCount, followingCount));
         })
         .WithName("Me")
         .WithTags("Profiles")
@@ -33,6 +36,7 @@ public static class ProfileEndpoints
             HttpContext ctx,
             GameOrgDbContext db,
             ProfileService profileService,
+            FollowService followService,
             CancellationToken ct) =>
         {
             var user = await LoadFullUserAsync(db, principal, ct);
@@ -46,7 +50,9 @@ public static class ProfileEndpoints
             }
 
             var locale = RequestLocale.Resolve(ctx.Request.Headers.AcceptLanguage.ToString());
-            return Results.Ok(MapMe(user, locale));
+            var followersCount = await followService.CountFollowersAsync(FollowTargetType.User, user.Id, ct);
+            var followingCount = await followService.CountFollowingAsync(user.Id, ct);
+            return Results.Ok(MapMe(user, locale, followersCount, followingCount));
         })
         .WithName("UpdateMe")
         .WithTags("Profiles")
@@ -93,7 +99,8 @@ public static class ProfileEndpoints
         .RequireAuthorization()
         .Produces(StatusCodes.Status404NotFound);
 
-        app.MapGet("/api/users/{handle}", async (string handle, HttpContext ctx, GameOrgDbContext db, CancellationToken ct) =>
+        app.MapGet("/api/users/{handle}", async (
+            string handle, HttpContext ctx, ClaimsPrincipal principal, GameOrgDbContext db, FollowService followService, CancellationToken ct) =>
         {
             var normalized = handle.TrimStart('@').ToLowerInvariant();
 
@@ -107,7 +114,9 @@ public static class ProfileEndpoints
                 return Results.NotFound();
 
             var locale = RequestLocale.ResolveAndVary(ctx);
-            return Results.Ok(MapPublic(user, locale));
+            var followersCount = await followService.CountFollowersAsync(FollowTargetType.User, user.Id, ct);
+            var viewerIsFollowing = await followService.IsFollowingAsync(GetUserId(principal), FollowTargetType.User, user.Id, ct);
+            return Results.Ok(MapPublic(user, locale, followersCount, viewerIsFollowing));
         })
         .WithName("GetPublicProfile")
         .WithTags("Profiles")
@@ -135,7 +144,7 @@ public static class ProfileEndpoints
             .FirstOrDefaultAsync(u => u.Id == userId && u.DeletedAt == null, ct);
     }
 
-    private static MeProfileDto MapMe(User user, string locale) => new(
+    private static MeProfileDto MapMe(User user, string locale, int followersCount, int followingCount) => new(
         user.Id, user.Handle,
         Localized.Resolve(user.DisplayNameI18n, locale) ?? "",
         Localized.Resolve(user.BioI18n, locale),
@@ -143,16 +152,18 @@ public static class ProfileEndpoints
         user.Locale, user.Timezone, user.ProfileVisibility, MapCity(user.City), user.AvatarId, user.IsVerified,
         user.Role,
         user.Sports.Select(MapUserSport).ToList(),
+        followersCount, followingCount,
         LocalizedTextDto.From(user.DisplayNameI18n),
         LocalizedTextDto.FromNullable(user.BioI18n));
 
-    private static PublicProfileDto MapPublic(User user, string locale) => new(
+    private static PublicProfileDto MapPublic(User user, string locale, int followersCount, bool viewerIsFollowing) => new(
         user.Id,
         user.Handle,
         Localized.Resolve(user.DisplayNameI18n, locale) ?? "",
         Localized.Resolve(user.BioI18n, locale),
         MapCity(user.City), user.AvatarId, user.IsVerified,
-        user.Sports.Where(s => s.Visibility == Visibility.Public).Select(MapPublicUserSport).ToList());
+        user.Sports.Where(s => s.Visibility == Visibility.Public).Select(MapPublicUserSport).ToList(),
+        followersCount, viewerIsFollowing);
 
     private static CityDto? MapCity(City? city) => city is null ? null : new CityDto(city.Id, city.Slug, city.NameI18n, city.Lat, city.Lng);
 

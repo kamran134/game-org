@@ -36,6 +36,8 @@ public sealed record MeProfileDto(
     bool IsVerified,
     UserRole Role,
     List<UserSportDto> Sports,
+    int FollowersCount,
+    int FollowingCount,
     // Резолвнутые DisplayName/Bio выше — для отображения. Эти два — сырые
     // словари по всем языкам, нужны только форме редактирования (/me).
     LocalizedTextDto DisplayNameI18n,
@@ -66,7 +68,9 @@ public sealed record PublicProfileDto(
     CityDto? City,
     Guid? AvatarId,
     bool IsVerified,
-    List<PublicUserSportDto> Sports);
+    List<PublicUserSportDto> Sports,
+    int FollowersCount,
+    bool ViewerIsFollowing);
 
 /// <summary>
 /// Поле есть в теле и не null → применяется. Поле отсутствует/null → не
