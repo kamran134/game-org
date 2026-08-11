@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { Users, MapPinLine, Copy } from "@phosphor-icons/react";
 import { Link, useRouter } from "@/i18n/navigation";
 import { FollowButton } from "@/components/FollowButton";
+import { CopyLinkButton } from "@/components/CopyLinkButton";
 import {
   deleteClub,
   getClubAuthed,
@@ -178,6 +179,7 @@ export function ClubView({ apiUrl, locale, slug }: { apiUrl: string; locale: str
                 </Link>
               </>
             )}
+            {club.visibility !== "Public" && <CopyLinkButton label={t("copyLink")} copiedLabel={t("linkCopied")} />}
             {club.viewerRole === "Owner" && (
               <button
                 type="button"

@@ -13,6 +13,7 @@ import { MyPaymentBanner } from "./MyPaymentBanner";
 import { PaymentsSection } from "./PaymentsSection";
 import { JoinRequestsSection } from "./JoinRequestsSection";
 import { ReportButton } from "@/components/ReportButton";
+import { CopyLinkButton } from "@/components/CopyLinkButton";
 
 export const dynamic = "force-dynamic";
 
@@ -137,6 +138,7 @@ export default async function EventPage({ params }: { params: Promise<{ locale: 
               {t("editEvent")}
             </Link>
             <ReportButton apiUrl={apiUrl} targetType="Event" targetId={event.id} />
+            {event.visibility !== "Public" && <CopyLinkButton label={t("copyLink")} copiedLabel={t("linkCopied")} />}
           </div>
 
           <EventActions apiUrl={apiUrl} eventId={event.id} createdById={event.createdById} status={event.status} endsAt={event.endsAt} />

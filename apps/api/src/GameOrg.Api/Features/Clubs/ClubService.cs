@@ -114,7 +114,8 @@ public sealed class ClubService(
         return MapDetail(club, locale, viewerMembership, followersCount, viewerIsFollowing);
     }
 
-    public async Task<List<ClubDto>> GetListAsync(string locale, Guid? viewerId, Guid? cityId, Guid? sportId, ClubKind? kind, CancellationToken ct)
+    public async Task<List<ClubDto>> GetListAsync(
+        string locale, Guid? viewerId, Guid? cityId, Guid? sportId, ClubKind? kind, bool onlyMine, CancellationToken ct)
     {
         // Private — только клубы, где viewer активный участник; остальным как будто их нет в каталоге.
         var viewerClubIds = viewerId is null
@@ -124,7 +125,11 @@ public sealed class ClubService(
                 .Select(m => m.ClubId)
                 .ToListAsync(ct);
 
-        var query = db.Clubs.Where(c => c.Visibility != ClubVisibility.Private || viewerClubIds.Contains(c.Id));
+        if (onlyMine && viewerId is null) return [];
+
+        var query = onlyMine
+            ? db.Clubs.Where(c => viewerClubIds.Contains(c.Id) || c.CreatedById == viewerId)
+            : db.Clubs.Where(c => c.Visibility != ClubVisibility.Private || viewerClubIds.Contains(c.Id));
         if (cityId is not null) query = query.Where(c => c.CityId == cityId);
         if (sportId is not null) query = query.Where(c => c.Sports.Any(s => s.SportId == sportId));
         if (kind is not null) query = query.Where(c => c.Kind == kind);

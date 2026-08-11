@@ -1,7 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import { Users, Lock } from "@phosphor-icons/react/dist/ssr";
 import { Link } from "@/i18n/navigation";
 import { getClubs } from "@/lib/clubsApi";
+import { ClubsList } from "./ClubsList";
 
 export const dynamic = "force-dynamic";
 
@@ -34,32 +34,7 @@ export default async function ClubsPage({
           </Link>
         </div>
 
-        {clubs.length === 0 ? (
-          <p className="text-foreground/70">{t("empty")}</p>
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {clubs.map((c) => (
-              <li key={c.id}>
-                <Link
-                  href={`/clubs/${c.slug}`}
-                  className="flex items-center justify-between gap-4 rounded-2xl border border-brand-border bg-background px-5 py-4 transition-colors duration-200 hover:border-brand-primary/40"
-                >
-                  <div className="flex items-center gap-2">
-                    {c.visibility === "Private" && <Lock size={16} weight="bold" className="text-foreground/40" />}
-                    <div>
-                      <p className="font-medium text-foreground">{c.name}</p>
-                      {c.city && <p className="mt-1 text-sm text-foreground/60">{c.city.nameI18n[locale] ?? c.city.slug}</p>}
-                    </div>
-                  </div>
-                  <span className="flex shrink-0 items-center gap-1 text-sm text-foreground/50">
-                    <Users size={14} weight="bold" />
-                    {c.membersCount}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+        <ClubsList apiUrl={apiUrl} cityId={sp.cityId} sportId={sp.sportId} kind="Club" initialClubs={clubs} />
       </div>
     </main>
   );

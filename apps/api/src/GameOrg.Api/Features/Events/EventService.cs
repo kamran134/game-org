@@ -408,10 +408,12 @@ public sealed class EventService(
         return (true, null);
     }
 
-    public async Task<List<EventDto>> GetListAsync(Guid? sportId, Guid? cityId, bool upcoming, string locale, Guid? viewerId, CancellationToken ct)
+    public async Task<List<EventDto>> GetListAsync(
+        Guid? sportId, Guid? cityId, bool upcoming, bool onlyMine, string locale, Guid? viewerId, CancellationToken ct)
     {
-        // Public — всем; Unlisted — отдельная задача ("по ссылке", ещё не
-        // запланирована); Club — только активным участникам этого клуба.
+        // Public — всем; Club — только активным участникам этого клуба; Unlisted
+        // (и вообще любая видимость) — ещё и создателю/участнику, иначе
+        // Unlisted-событие было невидимо даже тому, кто его сделал (Шаг 21).
         var viewerClubIds = viewerId is null
             ? []
             : await db.ClubMembers
@@ -419,9 +421,18 @@ public sealed class EventService(
                 .Select(m => m.ClubId)
                 .ToListAsync(ct);
 
-        var query = db.Events.Where(e =>
-            e.Visibility == EventVisibility.Public
-            || (e.Visibility == EventVisibility.Club && e.ClubId != null && viewerClubIds.Contains(e.ClubId.Value)));
+        var myParticipantEventIds = viewerId is null
+            ? []
+            : await db.EventParticipants.Where(p => p.UserId == viewerId).Select(p => p.EventId).ToListAsync(ct);
+
+        if (onlyMine && viewerId is null) return [];
+
+        var query = onlyMine
+            ? db.Events.Where(e => e.CreatedById == viewerId || myParticipantEventIds.Contains(e.Id))
+            : db.Events.Where(e =>
+                e.Visibility == EventVisibility.Public
+                || (e.Visibility == EventVisibility.Club && e.ClubId != null && viewerClubIds.Contains(e.ClubId.Value))
+                || (viewerId != null && (e.CreatedById == viewerId || myParticipantEventIds.Contains(e.Id))));
 
         if (sportId is not null) query = query.Where(e => e.SportId == sportId);
         if (cityId is not null) query = query.Where(e => e.Venue != null && e.Venue.CityId == cityId);

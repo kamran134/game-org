@@ -110,6 +110,26 @@ export async function getClubs(
   return res.json();
 }
 
+// С cookie — для фильтра "Мои" (Шаг 21), тот же приём, что getEventsAuthed.
+export async function getClubsAuthed(
+  apiUrl: string,
+  locale: string,
+  params: { cityId?: string; sportId?: string; kind?: ClubKind; onlyMine?: boolean } = {},
+): Promise<ClubListItem[]> {
+  const query = new URLSearchParams();
+  if (params.cityId) query.set("cityId", params.cityId);
+  if (params.sportId) query.set("sportId", params.sportId);
+  if (params.kind) query.set("kind", params.kind);
+  if (params.onlyMine) query.set("onlyMine", "true");
+
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/clubs?${query.toString()}`, {
+    credentials: "include",
+    headers: localeHeaders(locale),
+  });
+  if (!res.ok) throw new Error(`Не удалось загрузить клубы (${res.status})`);
+  return res.json();
+}
+
 export async function getClub(apiUrl: string, locale: string, slug: string): Promise<ClubDetail | null> {
   const res = await fetch(`${apiBase(apiUrl)}/api/clubs/${encodeURIComponent(slug)}`, {
     cache: "no-store",

@@ -203,6 +203,28 @@ export async function getEvents(
   return res.json();
 }
 
+// Список — с cookie, для фильтра "Мои" (Шаг 21): страница списка сама SSR
+// анонимна (без credentials, как и остальные каталоги), "Мои" — отдельный
+// клиентский дозапрос, тот же приём, что getEventAuthed для детальной.
+export async function getEventsAuthed(
+  apiUrl: string,
+  locale: string,
+  params: { sportId?: string; cityId?: string; upcoming?: boolean; onlyMine?: boolean },
+): Promise<EventListItem[]> {
+  const query = new URLSearchParams();
+  if (params.sportId) query.set("sportId", params.sportId);
+  if (params.cityId) query.set("cityId", params.cityId);
+  query.set("upcoming", params.upcoming === false ? "false" : "true");
+  if (params.onlyMine) query.set("onlyMine", "true");
+
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/events?${query.toString()}`, {
+    credentials: "include",
+    headers: localeHeaders(locale),
+  });
+  if (!res.ok) throw new Error(`Не удалось загрузить события (${res.status})`);
+  return res.json();
+}
+
 export async function getEvent(apiUrl: string, locale: string, publicId: string): Promise<EventDetail | null> {
   const res = await fetch(`${apiBase(apiUrl)}/api/events/${encodeURIComponent(publicId)}`, {
     cache: "no-store",

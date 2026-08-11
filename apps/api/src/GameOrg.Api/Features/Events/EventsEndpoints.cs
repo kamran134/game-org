@@ -16,10 +16,11 @@ public static class EventsEndpoints
             Guid? sportId,
             Guid? cityId,
             bool upcoming,
+            bool onlyMine,
             CancellationToken ct) =>
         {
             var locale = RequestLocale.ResolveAndVary(ctx);
-            var events = await eventService.GetListAsync(sportId, cityId, upcoming, locale, GetUserId(principal), ct);
+            var events = await eventService.GetListAsync(sportId, cityId, upcoming, onlyMine, locale, GetUserId(principal), ct);
             return Results.Ok(events);
         })
         .WithName("GetEvents")
