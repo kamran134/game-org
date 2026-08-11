@@ -1788,6 +1788,206 @@ Cancelled}`, `PaymentMethod{Cash,BankTransfer,CardOnline,Balance}`,
 
 ---
 
+### Шаги 19-24 — Membership, discovery, admin (написано Opus, реализует Sonnet)
+
+Written in English deliberately: this block is an implementation brief, not user-facing
+copy. All bot/UI strings it produces still go through i18n in ru/az/en.
+
+Source: user QA session on dev after Step 18. Seven issues raised; grouped below into
+six steps. **Do the steps in order** — 19 and 20 change the domain that 21-24 render.
+
+Decisions already made by the user (do not re-litigate):
+- Groups are **not** a new entity: `Club` gets a `Kind` discriminator.
+- Event join approval is **organizer-controlled**, defaulting to on for Public events.
+- Admin panel = `/admin` with a **left sidebar**, sections: Overview, Users, Venues,
+  Reports, Claims. Event/club management and audit-log viewer are explicitly out of scope.
+
+---
+
+#### Step 19 — Join requests for events (+ wire the club ones)
+
+**Problem.** `EventService.JoinAsync` admits anyone instantly. Clubs already have
+approval (`RequestOnly` → `MembershipStatus.Pending`), events have nothing.
+
+**Domain.**
+- `ParticipationStatus`: add `PendingApproval`. Safe — the column is
+  `HasConversion<string>()` (see `EventParticipantConfiguration.cs:14`), so adding a
+  member does not renumber existing rows.
+- `Event`: add `bool RequiresApproval` (default `false`; migration must add it with a
+  default so existing rows stay valid).
+- `NotificationType`: add `EventJoinRequest`, `EventJoinApproved`, `EventJoinRejected`.
+  Same string-storage argument applies.
+
+**Rules.**
+- On create/update: if `Visibility == Public`, `RequiresApproval` defaults to `true`;
+  for `Club`/`Unlisted` force it to `false` — closed audiences are already gated, and the
+  user explicitly accepted that risk ("если кто-то левый попал — ответственный разберётся").
+- `JoinAsync`: when `RequiresApproval` and the joiner is not the creator →
+  `PendingApproval`, skip capacity/waitlist resolution entirely (capacity is decided at
+  approval time, not request time).
+- `PendingApproval` must **not** count toward `ConfirmedCount`, must **not** create a
+  `Payment`, must **not** emit an `Activity`. Grep every `ParticipationStatus.Confirmed`
+  comparison and confirm each one still behaves.
+- Approve → run the normal `ResolveJoinStatusAsync` path (so a full event lands the person
+  on the waitlist rather than overfilling), then `EnsurePaymentAsync` +
+  `RecomputeTotalSplitAsync`, exactly as `PromoteFromWaitlistAsync` does today.
+- Reject → delete the participant row (not a tombstone; the person may re-apply).
+
+**Endpoints** (`EventsEndpoints.cs`, both `.RequireAuthorization()`):
+- `POST /api/events/{id:guid}/participants/{participantId:guid}/approve`
+- `POST /api/events/{id:guid}/participants/{participantId:guid}/reject`
+Authorization: event creator, or a club Owner/Admin when `ev.ClubId` is set, or
+site Moderator/Admin. Reuse the existing string-matching error→status convention.
+
+**Notifications.** Organizer gets `EventJoinRequest` on request; requester gets
+`EventJoinApproved`/`EventJoinRejected` on decision. Add all three plus the already-existing
+`ClubJoinRequest` to `NotificationService.WiredTypes` — `ClubJoinRequest` is listed there
+already, but verify `ClubService.JoinAsync` actually calls `notificationSender.SendAsync`
+for it; if it does not, that is a silent gap to close in this step.
+
+**Frontend.** `EventActions`: button label becomes "Подать заявку" when approval is on;
+show a "Заявка на рассмотрении" state for `PendingApproval`. New `JoinRequestsSection`
+(organizer-only, mirrors `PaymentsSection`'s `canManage` pattern) listing pending
+requesters with Approve/Reject.
+
+---
+
+#### Step 20 — Groups as a kind of Club
+
+**Domain.** `enum ClubKind { Club, Group }`; `Club.Kind` (default `Club`,
+`HasConversion<string>()`, migration with default). Nothing else changes — members,
+roles, invite codes, join requests, permissions all carry over untouched. This is the
+whole point of the decision.
+
+**Backend.** `GET /api/clubs` takes `kind` (nullable → both). `CreateClubRequest` takes
+`Kind`. `ClubDto`/`ClubDetailDto` expose it.
+
+**Frontend.** `/groups` and `/groups/new` are thin wrappers over the existing club
+pages with `kind=Group` pinned; `/clubs` filters to `kind=Club`. Add "Группы" to
+`SiteHeader` nav. i18n: new `Groups` namespace, or reuse `Clubs` keys with a
+group-flavoured heading set — the latter is cheaper and acceptable here.
+
+Semantics to put in the UI copy: a club is a standing team, a group is situational
+(one-off games, ad-hoc collaborations). No behavioural difference beyond the label.
+
+---
+
+#### Step 21 — Fix visibility of hidden entities
+
+**The actual bug.** `EventService.GetListAsync` (`EventService.cs:415`) admits only
+`Public` and `Club` events. An `Unlisted` event is invisible to **its own creator and
+its own participants** — they can only reach it if they kept the URL. Clubs do this
+correctly already (`ClubService.cs:123`); events were left as a TODO
+("Unlisted — отдельная задача, ещё не запланирована") and this step closes it.
+
+Fix the predicate to also admit events where the viewer is the creator or has any
+participant row. Verify the same for `ClubService.GetListAsync`: confirm the creator is
+inserted as an `Active` `Owner` at creation time, so a `Private` club is never invisible
+to the person who made it.
+
+**Copy-link affordance.** On the detail page of any non-public event/club/group, render a
+"Скопировать ссылку" control (`navigator.clipboard.writeText`, with a "Скопировано"
+confirmation). It must be present on every visit, not just right after creation —
+post-create redirect already lands on the entity page
+(`ClubForm.tsx:68`, `EventForm.tsx:138`), so no redirect work is needed.
+
+**Discoverability.** Add a "Мои" filter to both lists (created by me, or I am a
+member/participant) so hidden things have a home in the UI rather than living only in
+saved links.
+
+---
+
+#### Step 22 — Notification deep links
+
+**Good news.** `Notification.Data` already carries `eventId`/`clubId`/`paymentId`
+(see the `SendAsync` calls). The list renders plain `<button>`s and drops that payload
+on the floor — this is a frontend-only step apart from spot-fixes.
+
+Add `notificationHref(n)` in `apps/web/src/lib/notificationsApi.ts`:
+
+| Type | Target |
+|---|---|
+| `EventJoinRequest` | `/events/{id}#requests` |
+| `EventJoinApproved` / `Rejected` / reminders / `EventUpdated` / `Cancelled` / `Confirmed` / `ParticipantJoined` / `ParticipantLeft` / `WaitlistPromoted` / `MvpVoteOpen` / `ResultPosted` | `/events/{id}` |
+| `PaymentDue` | `/me/payments` |
+| `PaymentConfirmed` | `/me/payments` |
+| `ClubJoinRequest` | `/clubs/{slug}/members` |
+| `ClubInvite` | `/clubs/{slug}` |
+| `NewFollower` | `/{handle}` |
+| `AchievementEarned` | `/me/achievements` |
+
+Unknown/absent payload → render non-clickable, never a dead link to `/undefined`.
+
+Two backend spot-fixes this requires:
+- club notifications must put `slug` (not only `clubId`) in `Data`, or the frontend needs
+  an id→slug lookup; putting the slug in `Data` is cheaper.
+- `NewFollower` must carry the follower's `handle`.
+
+Apply the mapping in **both** the bell dropdown and `/notifications`. Clicking marks read
+and navigates in one action.
+
+---
+
+#### Step 23 — `/admin` panel
+
+Replaces `/moderation`. Keep the old route as a redirect so existing links survive.
+
+**Layout.** Two-column: persistent left sidebar (vertical nav, collapses to a top
+`<select>` under `md`), content on the right. This is the explicit reason for dropping
+tabs — the user's complaint is that tabs stop fitting as sections are added, and a
+sidebar grows without a layout rewrite.
+
+Sections: **Обзор** (counts per queue), **Пользователи**, **Площадки**, **Жалобы**,
+**Заявки**. Sidebar shows a pending-count badge per section.
+
+**New backend** (`Features/Moderation/AdminEndpoints.cs`):
+- `GET /api/admin/users?query=&role=&banned=&skip=&take=` — search by handle/display
+  name, paged. Policy `Moderator`.
+- `PATCH /api/admin/users/{id:guid}/role` — policy **`Admin`** only.
+- Existing ban/unban stay where they are; surface them in the Users section.
+
+**Permissions.** Moderator: view all sections, resolve reports, publish/hide venues,
+resolve claims, ban/unban. Admin: all of that **plus** role changes. The UI must hide
+what the viewer cannot do, and the server must enforce it independently — the hidden
+button is not the check.
+
+Every mutating action goes through `AuditLogService`, as Step 10 established.
+
+---
+
+#### Step 24 — Discovery and filters
+
+The user's last point ("всё вываливает в одну кучу"). The backend already accepts
+`sportId`/`cityId` for both events and clubs — **there is simply no UI**, so most of this
+is frontend work over endpoints that exist.
+
+**Shared `FilterBar` component**, state synced to URL query params (shareable/back-button
+correct, and the params are already the ones the API takes).
+
+- **Events:** sport, city, type, date range, "бесплатные / платные", "мои" (created by me
+  or I am in), "мои клубы". Group the result list by day with sticky date headings instead
+  of one flat column. Cards show sport emoji, time, venue, filled/capacity, price,
+  and an approval badge when `RequiresApproval`.
+- **Venues:** sport, city, indoor/outdoor, "рядом со мной" (already exists — fold it into
+  the bar rather than leaving it as a lone button).
+- **Clubs/Groups:** sport, city, kind, "мои".
+
+Backend additions needed for the above: `type`, `dateFrom`/`dateTo`, `onlyMine`,
+`onlyFree` on `GET /api/events`; `onlyMine` on `GET /api/clubs`; sport/city/indoor on
+`GET /api/venues` if absent.
+
+Empty states must say what was filtered out and offer a one-click reset — an empty list
+with no explanation is what the current UI already does badly.
+
+---
+
+**Verification for every step:** `dotnet build`, `dotnet test` (the Step 18 CI gate now
+blocks deploy on red), `pnpm --filter web run build`, `pnpm run lint`, then a live pass on
+dev.game.org.az. The Step 18 postmortem is the reason for that last item: build and tests
+were green while the site was down, because nothing exercised a running host.
+
+---
+
 ## 9. Конвенции
 
 **C#:** nullable reference types включены; `sealed` по умолчанию; async/await везде,
