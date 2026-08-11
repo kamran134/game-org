@@ -13,7 +13,13 @@ export type NotificationType =
   | "ParticipantLeft"
   | "WaitlistPromoted"
   | "ClubInvite"
-  | "ClubJoinRequest";
+  | "ClubJoinRequest"
+  | "NewFollower"
+  | "MvpVoteOpen"
+  | "ResultPosted"
+  | "AchievementEarned";
+
+export type NotificationChannel = "Telegram" | "Push";
 
 export type NotificationItem = {
   id: string;
@@ -72,16 +78,21 @@ export async function markAllNotificationsRead(apiUrl: string): Promise<void> {
   if (!res.ok) throw new Error(`Не удалось отметить уведомления прочитанными (${res.status})`);
 }
 
-export async function getNotificationPreferences(apiUrl: string): Promise<NotificationPreference[]> {
-  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/me/notification-preferences`, {
+export async function getNotificationPreferences(apiUrl: string, channel: NotificationChannel = "Telegram"): Promise<NotificationPreference[]> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/me/notification-preferences?channel=${channel}`, {
     credentials: "include",
   });
   if (!res.ok) throw new Error(`Не удалось загрузить настройки уведомлений (${res.status})`);
   return res.json();
 }
 
-export async function setNotificationPreference(apiUrl: string, type: NotificationType, enabled: boolean): Promise<void> {
-  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/me/notification-preferences/${type}`, {
+export async function setNotificationPreference(
+  apiUrl: string,
+  type: NotificationType,
+  enabled: boolean,
+  channel: NotificationChannel = "Telegram",
+): Promise<void> {
+  const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/me/notification-preferences/${type}?channel=${channel}`, {
     method: "PUT",
     credentials: "include",
     headers: { "Content-Type": "application/json" },

@@ -403,8 +403,21 @@
     "saveError": "Не удалось сохранить настройку",
     "loadMore": "Показать ещё",
     "preferencesTitle": "Настройки уведомлений",
-    "preferencesSubtitle": "Что присылать в Telegram. В приложении уведомления показываются всегда — их нельзя отключить.",
+    "preferencesSubtitle": "Что присылать в Telegram и push-уведомлениями в браузере. В приложении уведомления показываются всегда — их нельзя отключить.",
     "backToProfile": "Мой профиль",
+    "telegramHeading": "Telegram",
+    "push": {
+      "heading": "Push-уведомления в браузере",
+      "unsupported": "Браузер не поддерживает push-уведомления.",
+      "unavailable": "Push пока не настроен на сервере.",
+      "subscribedHint": "Включены на этом устройстве.",
+      "unsubscribedHint": "Выключены на этом устройстве.",
+      "enable": "Включить",
+      "disable": "Выключить",
+      "permissionDenied": "Разрешение на уведомления не дано в браузере.",
+      "enableError": "Не удалось включить push-уведомления",
+      "disableError": "Не удалось выключить push-уведомления"
+    },
     "types": {
       "EventReminder24h": "Напоминание за 24 часа до игры",
       "EventReminder2h": "Напоминание за 2 часа до игры",
@@ -415,7 +428,11 @@
       "ParticipantLeft": "Отмена записи на моё событие",
       "WaitlistPromoted": "Перевод из листа ожидания в участники",
       "ClubInvite": "Приглашение в клуб",
-      "ClubJoinRequest": "Заявка на вступление в клуб"
+      "ClubJoinRequest": "Заявка на вступление в клуб",
+      "NewFollower": "Новый подписчик",
+      "MvpVoteOpen": "Открыто голосование за MVP",
+      "ResultPosted": "Опубликован результат события",
+      "AchievementEarned": "Новое достижение"
     }
   },
   "Clubs": {

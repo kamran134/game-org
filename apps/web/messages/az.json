@@ -403,8 +403,21 @@
     "saveError": "Ayar yadda saxlanmadı",
     "loadMore": "Daha çox göstər",
     "preferencesTitle": "Bildiriş ayarları",
-    "preferencesSubtitle": "Telegram-a nə göndərilsin. Tətbiqdəki bildirişlər həmişə görünür — onları söndürmək olmaz.",
+    "preferencesSubtitle": "Telegram-a və brauzer push-bildirişlərinə nə göndərilsin. Tətbiqdəki bildirişlər həmişə görünür — onları söndürmək olmaz.",
     "backToProfile": "Mənim profilim",
+    "telegramHeading": "Telegram",
+    "push": {
+      "heading": "Brauzer push-bildirişləri",
+      "unsupported": "Brauzer push-bildirişlərini dəstəkləmir.",
+      "unavailable": "Push hələ serverdə qurulmayıb.",
+      "subscribedHint": "Bu cihazda aktivdir.",
+      "unsubscribedHint": "Bu cihazda deaktivdir.",
+      "enable": "Aktivləşdir",
+      "disable": "Söndür",
+      "permissionDenied": "Brauzerdə bildiriş icazəsi verilmədi.",
+      "enableError": "Push-bildirişləri aktivləşdirmək mümkün olmadı",
+      "disableError": "Push-bildirişləri söndürmək mümkün olmadı"
+    },
     "types": {
       "EventReminder24h": "Oyundan 24 saat əvvəl xatırlatma",
       "EventReminder2h": "Oyundan 2 saat əvvəl xatırlatma",
@@ -415,7 +428,11 @@
       "ParticipantLeft": "Mənim tədbirimdən qeydiyyatın ləğvi",
       "WaitlistPromoted": "Gözləmə siyahısından iştirakçıya keçid",
       "ClubInvite": "Kluba dəvət",
-      "ClubJoinRequest": "Kluba qoşulma sorğusu"
+      "ClubJoinRequest": "Kluba qoşulma sorğusu",
+      "NewFollower": "Yeni izləyici",
+      "MvpVoteOpen": "MVP səsverməsi açıldı",
+      "ResultPosted": "Tədbirin nəticəsi paylaşıldı",
+      "AchievementEarned": "Yeni nailiyyət"
     }
   },
   "Clubs": {

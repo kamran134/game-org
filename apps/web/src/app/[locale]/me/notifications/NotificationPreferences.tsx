@@ -6,10 +6,12 @@ import { Link } from "@/i18n/navigation";
 import {
   getNotificationPreferences,
   setNotificationPreference,
+  type NotificationChannel,
   type NotificationPreference as Preference,
 } from "@/lib/notificationsApi";
+import { PushSubscriptionSection } from "./PushSubscriptionSection";
 
-export function NotificationPreferences({ apiUrl }: { apiUrl: string }) {
+function PreferencesList({ apiUrl, channel }: { apiUrl: string; channel: NotificationChannel }) {
   const t = useTranslations("Notifications");
   const tTypes = useTranslations("Notifications.types");
 
@@ -18,17 +20,17 @@ export function NotificationPreferences({ apiUrl }: { apiUrl: string }) {
   const [savingType, setSavingType] = useState<string | null>(null);
 
   useEffect(() => {
-    getNotificationPreferences(apiUrl)
+    getNotificationPreferences(apiUrl, channel)
       .then(setPrefs)
       .catch((err) => setError(err instanceof Error ? err.message : t("loadError")));
-  }, [apiUrl, t]);
+  }, [apiUrl, channel, t]);
 
   async function handleToggle(type: Preference["type"], enabled: boolean) {
     setSavingType(type);
     setError(null);
     setPrefs((prev) => prev?.map((p) => (p.type === type ? { ...p, enabled } : p)) ?? null);
     try {
-      await setNotificationPreference(apiUrl, type, enabled);
+      await setNotificationPreference(apiUrl, type, enabled, channel);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("saveError"));
       setPrefs((prev) => prev?.map((p) => (p.type === type ? { ...p, enabled: !enabled } : p)) ?? null);
@@ -36,6 +38,34 @@ export function NotificationPreferences({ apiUrl }: { apiUrl: string }) {
       setSavingType(null);
     }
   }
+
+  if (error) return <p className="text-sm text-red-600">{error}</p>;
+  if (prefs === null) return <p className="text-foreground/70">{t("loading")}</p>;
+
+  return (
+    <ul className="flex flex-col gap-2">
+      {prefs.map((pref) => (
+        <li key={pref.type} className="flex items-center justify-between rounded-2xl border border-brand-border bg-background px-5 py-4">
+          <span className="text-foreground">{tTypes(pref.type)}</span>
+          <label className="relative inline-flex cursor-pointer items-center">
+            <input
+              type="checkbox"
+              checked={pref.enabled}
+              disabled={savingType === pref.type}
+              onChange={(e) => handleToggle(pref.type, e.target.checked)}
+              className="peer sr-only"
+            />
+            <span className="h-6 w-11 rounded-full bg-brand-muted transition-colors duration-200 peer-checked:bg-brand-primary peer-disabled:opacity-50" />
+            <span className="absolute left-1 top-1 h-4 w-4 rounded-full bg-background transition-transform duration-200 peer-checked:translate-x-5" />
+          </label>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function NotificationPreferences({ apiUrl }: { apiUrl: string }) {
+  const t = useTranslations("Notifications");
 
   return (
     <div className="flex flex-col gap-6">
@@ -47,33 +77,16 @@ export function NotificationPreferences({ apiUrl }: { apiUrl: string }) {
         <p className="mt-1 text-sm text-foreground/60">{t("preferencesSubtitle")}</p>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      <div className="flex flex-col gap-3">
+        <h2 className="font-heading text-lg font-semibold text-foreground">{t("telegramHeading")}</h2>
+        <PreferencesList apiUrl={apiUrl} channel="Telegram" />
+      </div>
 
-      {prefs === null ? (
-        <p className="text-foreground/70">{t("loading")}</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {prefs.map((pref) => (
-            <li
-              key={pref.type}
-              className="flex items-center justify-between rounded-2xl border border-brand-border bg-background px-5 py-4"
-            >
-              <span className="text-foreground">{tTypes(pref.type)}</span>
-              <label className="relative inline-flex cursor-pointer items-center">
-                <input
-                  type="checkbox"
-                  checked={pref.enabled}
-                  disabled={savingType === pref.type}
-                  onChange={(e) => handleToggle(pref.type, e.target.checked)}
-                  className="peer sr-only"
-                />
-                <span className="h-6 w-11 rounded-full bg-brand-muted transition-colors duration-200 peer-checked:bg-brand-primary peer-disabled:opacity-50" />
-                <span className="absolute left-1 top-1 h-4 w-4 rounded-full bg-background transition-transform duration-200 peer-checked:translate-x-5" />
-              </label>
-            </li>
-          ))}
-        </ul>
-      )}
+      <div className="flex flex-col gap-3">
+        <h2 className="font-heading text-lg font-semibold text-foreground">{t("push.heading")}</h2>
+        <PushSubscriptionSection apiUrl={apiUrl} />
+        <PreferencesList apiUrl={apiUrl} channel="Push" />
+      </div>
     </div>
   );
 }

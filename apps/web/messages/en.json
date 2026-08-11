@@ -403,8 +403,21 @@
     "saveError": "Failed to save setting",
     "loadMore": "Load more",
     "preferencesTitle": "Notification settings",
-    "preferencesSubtitle": "What gets sent to Telegram. In-app notifications always show — they can't be turned off.",
+    "preferencesSubtitle": "What gets sent to Telegram and browser push notifications. In-app notifications always show — they can't be turned off.",
     "backToProfile": "My profile",
+    "telegramHeading": "Telegram",
+    "push": {
+      "heading": "Browser push notifications",
+      "unsupported": "This browser doesn't support push notifications.",
+      "unavailable": "Push isn't configured on the server yet.",
+      "subscribedHint": "Enabled on this device.",
+      "unsubscribedHint": "Disabled on this device.",
+      "enable": "Enable",
+      "disable": "Disable",
+      "permissionDenied": "Notification permission was not granted in the browser.",
+      "enableError": "Failed to enable push notifications",
+      "disableError": "Failed to disable push notifications"
+    },
     "types": {
       "EventReminder24h": "Reminder 24 hours before the game",
       "EventReminder2h": "Reminder 2 hours before the game",
@@ -415,7 +428,11 @@
       "ParticipantLeft": "Someone left my event",
       "WaitlistPromoted": "Moved from waitlist to participant",
       "ClubInvite": "Club invite",
-      "ClubJoinRequest": "Club join request"
+      "ClubJoinRequest": "Club join request",
+      "NewFollower": "New follower",
+      "MvpVoteOpen": "MVP voting is open",
+      "ResultPosted": "Event result posted",
+      "AchievementEarned": "New achievement"
     }
   },
   "Clubs": {
