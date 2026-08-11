@@ -1,4 +1,5 @@
 using GameOrg.Api.Common;
+using GameOrg.Api.Features.Clubs;
 using GameOrg.Api.Features.Moderation;
 using GameOrg.Api.Features.Sports;
 using GameOrg.Domain;
@@ -10,10 +11,13 @@ using Microsoft.EntityFrameworkCore;
 namespace GameOrg.Api.Features.Events;
 
 /// <summary>CRUD событий, запись участников (с вейтлистом), отмена. Напоминания за 24ч/2ч — EventReminderJob.</summary>
-public sealed class EventService(GameOrgDbContext db, NotificationSender notificationSender, AuditLogService auditLog)
+public sealed class EventService(GameOrgDbContext db, NotificationSender notificationSender, AuditLogService auditLog, ClubService clubService)
 {
     public async Task<(Event? Result, string? Error)> CreateAsync(Guid userId, CreateEventRequest request, CancellationToken ct)
     {
+        if (request.ClubId is not null && !await clubService.IsActiveMemberAsync(request.ClubId.Value, userId, ct))
+            return (null, "Привязать событие можно только к клубу, где вы участник.");
+
         var ev = new Event
         {
             PublicId = await GenerateUniquePublicIdAsync(ct),
@@ -118,7 +122,12 @@ public sealed class EventService(GameOrgDbContext db, NotificationSender notific
         return (true, null);
     }
 
-    public async Task<EventDetailDto?> GetByPublicIdAsync(string publicId, string locale, CancellationToken ct)
+    /// <summary>
+    /// Visibility.Club — видно только активным участникам этого клуба (тот же
+    /// viewerId-aware приём, что VenueService.GetBySlugAsync для Draft): 404,
+    /// не 403, чужому Club-событию как будто не существует.
+    /// </summary>
+    public async Task<EventDetailDto?> GetByPublicIdAsync(string publicId, string locale, Guid? viewerId, CancellationToken ct)
     {
         var ev = await db.Events
             .Include(e => e.Sport)
@@ -126,15 +135,32 @@ public sealed class EventService(GameOrgDbContext db, NotificationSender notific
             .Include(e => e.Participants).ThenInclude(p => p.User)
             .FirstOrDefaultAsync(e => e.PublicId == publicId, ct);
 
-        return ev is null ? null : MapDetail(ev, locale);
+        if (ev is null) return null;
+
+        if (ev.Visibility == EventVisibility.Club)
+        {
+            var isMember = ev.ClubId is not null && viewerId is not null
+                && await clubService.IsActiveMemberAsync(ev.ClubId.Value, viewerId.Value, ct);
+            if (!isMember) return null;
+        }
+
+        return MapDetail(ev, locale);
     }
 
-    public async Task<List<EventDto>> GetListAsync(Guid? sportId, Guid? cityId, bool upcoming, string locale, CancellationToken ct)
+    public async Task<List<EventDto>> GetListAsync(Guid? sportId, Guid? cityId, bool upcoming, string locale, Guid? viewerId, CancellationToken ct)
     {
-        // Только Public — тот же охват, что и events_upcoming_public
-        // (001_constraints.sql): показ Club/Unlisted событий в общем списке —
-        // отдельная, ещё не запланированная задача ("мои события"/клубная лента).
-        var query = db.Events.Where(e => e.Visibility == EventVisibility.Public);
+        // Public — всем; Unlisted — отдельная задача ("по ссылке", ещё не
+        // запланирована); Club — только активным участникам этого клуба.
+        var viewerClubIds = viewerId is null
+            ? []
+            : await db.ClubMembers
+                .Where(m => m.UserId == viewerId && m.Status == MembershipStatus.Active)
+                .Select(m => m.ClubId)
+                .ToListAsync(ct);
+
+        var query = db.Events.Where(e =>
+            e.Visibility == EventVisibility.Public
+            || (e.Visibility == EventVisibility.Club && e.ClubId != null && viewerClubIds.Contains(e.ClubId.Value)));
 
         if (sportId is not null) query = query.Where(e => e.SportId == sportId);
         if (cityId is not null) query = query.Where(e => e.Venue != null && e.Venue.CityId == cityId);

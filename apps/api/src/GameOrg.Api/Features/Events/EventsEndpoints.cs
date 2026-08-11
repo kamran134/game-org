@@ -12,23 +12,24 @@ public static class EventsEndpoints
         app.MapGet("/api/events", async (
             EventService eventService,
             HttpContext ctx,
+            ClaimsPrincipal principal,
             Guid? sportId,
             Guid? cityId,
             bool upcoming,
             CancellationToken ct) =>
         {
             var locale = RequestLocale.ResolveAndVary(ctx);
-            var events = await eventService.GetListAsync(sportId, cityId, upcoming, locale, ct);
+            var events = await eventService.GetListAsync(sportId, cityId, upcoming, locale, GetUserId(principal), ct);
             return Results.Ok(events);
         })
         .WithName("GetEvents")
         .WithTags("Events")
         .Produces<List<EventDto>>();
 
-        app.MapGet("/api/events/{publicId}", async (string publicId, HttpContext ctx, EventService eventService, CancellationToken ct) =>
+        app.MapGet("/api/events/{publicId}", async (string publicId, HttpContext ctx, ClaimsPrincipal principal, EventService eventService, CancellationToken ct) =>
         {
             var locale = RequestLocale.ResolveAndVary(ctx);
-            var ev = await eventService.GetByPublicIdAsync(publicId, locale, ct);
+            var ev = await eventService.GetByPublicIdAsync(publicId, locale, GetUserId(principal), ct);
             return ev is null ? Results.NotFound() : Results.Ok(ev);
         })
         .WithName("GetEvent")
@@ -50,7 +51,7 @@ public static class EventsEndpoints
             if (error is not null) return Results.Problem(error, statusCode: StatusCodes.Status400BadRequest);
 
             var locale = RequestLocale.Resolve(ctx.Request.Headers.AcceptLanguage.ToString());
-            var detail = await eventService.GetByPublicIdAsync(created!.PublicId, locale, ct);
+            var detail = await eventService.GetByPublicIdAsync(created!.PublicId, locale, userId, ct);
             return Results.Created($"/api/events/{created.PublicId}", detail);
         })
         .WithName("CreateEvent")

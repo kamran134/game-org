@@ -418,6 +418,11 @@ public sealed class ClubService(GameOrgDbContext db, NotificationSender notifica
         return membership is { Status: MembershipStatus.Active } && membership.Role is ClubRole.Owner or ClubRole.Admin;
     }
 
+    /// <summary>Используется EventService — ClubId у события можно поставить только на клуб,
+    /// где создатель активный участник, и Club-видимость события видна только участникам клуба.</summary>
+    public Task<bool> IsActiveMemberAsync(Guid clubId, Guid userId, CancellationToken ct) =>
+        db.ClubMembers.AnyAsync(m => m.ClubId == clubId && m.UserId == userId && m.Status == MembershipStatus.Active, ct);
+
     private ClubDetailDto MapDetail(Club club, string locale, ClubMember? viewerMembership)
     {
         var viewerIsManager = viewerMembership is { Status: MembershipStatus.Active } && viewerMembership.Role is ClubRole.Owner or ClubRole.Admin;
