@@ -34,7 +34,14 @@ export default async function EventsPage({
           </Link>
         </div>
 
-        <EventsList apiUrl={apiUrl} sportId={sp.sportId} upcoming={upcoming} initialEvents={events} />
+        <EventsList
+          apiUrl={apiUrl}
+          sportId={sp.sportId}
+          upcoming={upcoming}
+          onlyMine={sp.mine === "1"}
+          query={sp}
+          initialEvents={events}
+        />
       </div>
     </main>
   );

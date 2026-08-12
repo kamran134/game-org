@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
-import { useSearchParams } from "next/navigation";
 import { CalendarBlank, MapPinLine, UsersThree } from "@phosphor-icons/react";
 import { Link } from "@/i18n/navigation";
 import { getEventsAuthed, type EventListItem } from "@/lib/eventsApi";
@@ -10,26 +9,28 @@ import { getEventsAuthed, type EventListItem } from "@/lib/eventsApi";
 // Единственный источник истины для всех фильтров — URL (?past=1&mine=1).
 // Никакого локального состояния переключателей: любая комбинация вкладок
 // выражается ссылкой, поэтому не бывает рассинхрона между тем, что в адресе,
-// и тем, что нарисовано. Список "Мои" грузится на клиенте — SSR-запрос
-// анонимный (как весь каталог), а тут нужна кука; всё остальное приходит
-// готовым с сервера первым рендером.
+// и тем, что нарисовано. Значения фильтров приходят пропами со страницы —
+// она и так читает searchParams на сервере, клиентский хук тут лишний.
+// Список "Мои" грузится на клиенте: SSR-запрос анонимный (как весь каталог),
+// а тут нужна кука; всё остальное приходит готовым с сервера первым рендером.
 export function EventsList({
   apiUrl,
   sportId,
   upcoming,
+  onlyMine,
+  query,
   initialEvents,
 }: {
   apiUrl: string;
   sportId?: string;
   upcoming: boolean;
+  onlyMine: boolean;
+  query: Record<string, string | undefined>;
   initialEvents: EventListItem[];
 }) {
   const t = useTranslations("Events");
   const locale = useLocale();
   const format = useFormatter();
-  const searchParams = useSearchParams();
-
-  const onlyMine = searchParams.get("mine") === "1";
   // Ключ набора фильтров: пока загруженные "Мои" относятся к другому набору,
   // показываем загрузку, а не устаревший список от прошлой вкладки.
   const filterKey = `${upcoming ? "upcoming" : "past"}|${sportId ?? ""}`;
@@ -54,7 +55,10 @@ export function EventsList({
   const events = onlyMine ? (mineReady ? mine.items : null) : initialEvents;
 
   function hrefWith(overrides: Record<string, string | null>): string {
-    const next = new URLSearchParams(searchParams.toString());
+    const next = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined) next.set(key, value);
+    }
     for (const [key, value] of Object.entries(overrides)) {
       if (value === null) next.delete(key);
       else next.set(key, value);

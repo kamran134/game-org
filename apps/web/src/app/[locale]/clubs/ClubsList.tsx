@@ -2,20 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { useSearchParams } from "next/navigation";
 import { Users, Lock } from "@phosphor-icons/react";
 import { Link } from "@/i18n/navigation";
 import { getClubsAuthed, type ClubKind, type ClubListItem } from "@/lib/clubsApi";
 
 // Тот же принцип, что в EventsList: единственный источник истины — URL
-// (?mine=1). Локального состояния фильтра нет, поэтому рассинхрону между
-// адресом и отрисованным списком взяться неоткуда.
+// (?mine=1), значения приходят пропами со страницы. Локального состояния
+// фильтра нет, поэтому рассинхрону между адресом и списком взяться неоткуда.
 export function ClubsList({
   apiUrl,
   basePath,
   cityId,
   sportId,
   kind,
+  onlyMine,
+  query,
   initialClubs,
 }: {
   apiUrl: string;
@@ -23,13 +24,12 @@ export function ClubsList({
   cityId?: string;
   sportId?: string;
   kind: ClubKind;
+  onlyMine: boolean;
+  query: Record<string, string | undefined>;
   initialClubs: ClubListItem[];
 }) {
   const t = useTranslations("Clubs");
   const locale = useLocale();
-  const searchParams = useSearchParams();
-
-  const onlyMine = searchParams.get("mine") === "1";
   const filterKey = `${kind}|${cityId ?? ""}|${sportId ?? ""}`;
   const [mine, setMine] = useState<{ key: string; items: ClubListItem[] } | null>(null);
 
@@ -52,7 +52,10 @@ export function ClubsList({
   const clubs = onlyMine ? (mineReady ? mine.items : null) : initialClubs;
 
   function hrefWith(overrides: Record<string, string | null>): string {
-    const next = new URLSearchParams(searchParams.toString());
+    const next = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined) next.set(key, value);
+    }
     for (const [key, value] of Object.entries(overrides)) {
       if (value === null) next.delete(key);
       else next.set(key, value);

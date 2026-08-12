@@ -37,7 +37,16 @@ export default async function GroupsPage({
           </Link>
         </div>
 
-        <ClubsList apiUrl={apiUrl} basePath="/groups" cityId={sp.cityId} sportId={sp.sportId} kind="Group" initialClubs={groups} />
+        <ClubsList
+          apiUrl={apiUrl}
+          basePath="/groups"
+          cityId={sp.cityId}
+          sportId={sp.sportId}
+          kind="Group"
+          onlyMine={sp.mine === "1"}
+          query={sp}
+          initialClubs={groups}
+        />
       </div>
     </main>
   );
