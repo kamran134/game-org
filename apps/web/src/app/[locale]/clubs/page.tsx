@@ -10,7 +10,7 @@ export default async function ClubsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ cityId?: string; sportId?: string }>;
+  searchParams: Promise<{ cityId?: string; sportId?: string; mine?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
@@ -34,7 +34,7 @@ export default async function ClubsPage({
           </Link>
         </div>
 
-        <ClubsList apiUrl={apiUrl} cityId={sp.cityId} sportId={sp.sportId} kind="Club" initialClubs={clubs} />
+        <ClubsList apiUrl={apiUrl} basePath="/clubs" cityId={sp.cityId} sportId={sp.sportId} kind="Club" initialClubs={clubs} />
       </div>
     </main>
   );

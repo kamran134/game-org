@@ -10,7 +10,7 @@ export default async function EventsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ sportId?: string; past?: string }>;
+  searchParams: Promise<{ sportId?: string; past?: string; mine?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);

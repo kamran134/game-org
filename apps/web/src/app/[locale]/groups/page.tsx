@@ -13,7 +13,7 @@ export default async function GroupsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ cityId?: string; sportId?: string }>;
+  searchParams: Promise<{ cityId?: string; sportId?: string; mine?: string }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
@@ -37,7 +37,7 @@ export default async function GroupsPage({
           </Link>
         </div>
 
-        <ClubsList apiUrl={apiUrl} cityId={sp.cityId} sportId={sp.sportId} kind="Group" initialClubs={groups} />
+        <ClubsList apiUrl={apiUrl} basePath="/groups" cityId={sp.cityId} sportId={sp.sportId} kind="Group" initialClubs={groups} />
       </div>
     </main>
   );

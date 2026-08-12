@@ -1,21 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { Users, Lock } from "@phosphor-icons/react";
 import { Link } from "@/i18n/navigation";
 import { getClubsAuthed, type ClubKind, type ClubListItem } from "@/lib/clubsApi";
 
-// "Мои" — тот же приём, что EventsList: клиентский дозапрос с cookie,
-// потому что сама страница списка SSR-анонимна (Шаг 21).
+// Тот же принцип, что в EventsList: единственный источник истины — URL
+// (?mine=1). Локального состояния фильтра нет, поэтому рассинхрону между
+// адресом и отрисованным списком взяться неоткуда.
 export function ClubsList({
   apiUrl,
+  basePath,
   cityId,
   sportId,
   kind,
   initialClubs,
 }: {
   apiUrl: string;
+  basePath: "/clubs" | "/groups";
   cityId?: string;
   sportId?: string;
   kind: ClubKind;
@@ -23,38 +27,38 @@ export function ClubsList({
 }) {
   const t = useTranslations("Clubs");
   const locale = useLocale();
+  const searchParams = useSearchParams();
 
-  const [onlyMine, setOnlyMine] = useState(false);
-  const [clubs, setClubs] = useState(initialClubs);
-  const [loading, setLoading] = useState(false);
+  const onlyMine = searchParams.get("mine") === "1";
+  const filterKey = `${kind}|${cityId ?? ""}|${sportId ?? ""}`;
+  const [mine, setMine] = useState<{ key: string; items: ClubListItem[] } | null>(null);
 
-  // Тот же сброс, что в EventsList: смена searchParams (cityId/sportId) —
-  // soft navigation по тому же роуту, инстанс переживает переход, а
-  // useState(initialClubs) сеет только на первом рендере. Без этого фильтрация
-  // из режима "Мои" залипала бы намертво.
-  const [prevInitial, setPrevInitial] = useState(initialClubs);
-  if (prevInitial !== initialClubs) {
-    setPrevInitial(initialClubs);
-    setOnlyMine(false);
-    setClubs(initialClubs);
-    setLoading(false);
-  }
+  useEffect(() => {
+    if (!onlyMine) return;
+    let cancelled = false;
+    getClubsAuthed(apiUrl, locale, { cityId, sportId, kind, onlyMine: true })
+      .then((items) => {
+        if (!cancelled) setMine({ key: filterKey, items });
+      })
+      .catch(() => {
+        if (!cancelled) setMine({ key: filterKey, items: [] });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiUrl, locale, cityId, sportId, kind, onlyMine, filterKey]);
 
-  async function toggleMine() {
-    const next = !onlyMine;
-    setOnlyMine(next);
-    if (!next) {
-      setClubs(initialClubs);
-      return;
+  const mineReady = mine !== null && mine.key === filterKey;
+  const clubs = onlyMine ? (mineReady ? mine.items : null) : initialClubs;
+
+  function hrefWith(overrides: Record<string, string | null>): string {
+    const next = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(overrides)) {
+      if (value === null) next.delete(key);
+      else next.set(key, value);
     }
-    setLoading(true);
-    try {
-      setClubs(await getClubsAuthed(apiUrl, locale, { cityId, sportId, kind, onlyMine: true }));
-    } catch {
-      setClubs([]);
-    } finally {
-      setLoading(false);
-    }
+    const qs = next.toString();
+    return qs ? `${basePath}?${qs}` : basePath;
   }
 
   const emptyText = kind === "Group" ? t("emptyGroups") : t("empty");
@@ -63,20 +67,19 @@ export function ClubsList({
   return (
     <>
       <div className="mb-6 flex items-center gap-2 text-sm font-medium">
-        <button
-          type="button"
-          onClick={toggleMine}
-          className={`cursor-pointer rounded-full border px-4 py-1.5 transition-colors duration-200 ${
+        <Link
+          href={hrefWith({ mine: onlyMine ? null : "1" })}
+          className={`rounded-full border px-4 py-1.5 transition-colors duration-200 ${
             onlyMine
               ? "border-brand-primary bg-brand-primary/10 text-brand-primary"
               : "border-brand-border text-foreground/60 hover:border-brand-primary/40"
           }`}
         >
           {t("onlyMine")}
-        </button>
+        </Link>
       </div>
 
-      {loading ? (
+      {clubs === null ? (
         <p className="text-foreground/70">{t("loading")}</p>
       ) : clubs.length === 0 ? (
         <p className="text-foreground/70">{onlyMine ? emptyMineText : emptyText}</p>

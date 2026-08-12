@@ -1,14 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useFormatter, useLocale, useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { CalendarBlank, MapPinLine, UsersThree } from "@phosphor-icons/react";
 import { Link } from "@/i18n/navigation";
 import { getEventsAuthed, type EventListItem } from "@/lib/eventsApi";
 
-// "Мои" — клиентский дозапрос с cookie (getEventsAuthed), потому что сама
-// страница списка SSR-анонимна (как весь остальной каталог). Переключатель
-// живёт тут, а не в page.tsx, именно поэтому — там нет доступа к cookie.
+// Единственный источник истины для всех фильтров — URL (?past=1&mine=1).
+// Никакого локального состояния переключателей: любая комбинация вкладок
+// выражается ссылкой, поэтому не бывает рассинхрона между тем, что в адресе,
+// и тем, что нарисовано. Список "Мои" грузится на клиенте — SSR-запрос
+// анонимный (как весь каталог), а тут нужна кука; всё остальное приходит
+// готовым с сервера первым рендером.
 export function EventsList({
   apiUrl,
   sportId,
@@ -23,79 +27,64 @@ export function EventsList({
   const t = useTranslations("Events");
   const locale = useLocale();
   const format = useFormatter();
+  const searchParams = useSearchParams();
 
-  const [onlyMine, setOnlyMine] = useState(false);
-  const [events, setEvents] = useState(initialEvents);
-  const [loading, setLoading] = useState(false);
+  const onlyMine = searchParams.get("mine") === "1";
+  // Ключ набора фильтров: пока загруженные "Мои" относятся к другому набору,
+  // показываем загрузку, а не устаревший список от прошлой вкладки.
+  const filterKey = `${upcoming ? "upcoming" : "past"}|${sportId ?? ""}`;
+  const [mine, setMine] = useState<{ key: string; items: EventListItem[] } | null>(null);
 
-  // "Ближайшие"/"Прошедшие" — <Link>, т.е. soft navigation: инстанс этого
-  // компонента переживает переход, а useState(initialEvents) сеет только на
-  // первом рендере. Без сброса переключение вкладок из режима "Мои" ничего не
-  // меняло — список и подсветка навсегда залипали на "Мои". Сброс в теле
-  // рендера (приём из React-доков для производного от пропов состояния):
-  // новый серверный рендер даёт новую ссылку на массив.
-  const [prevInitial, setPrevInitial] = useState(initialEvents);
-  if (prevInitial !== initialEvents) {
-    setPrevInitial(initialEvents);
-    setOnlyMine(false);
-    setEvents(initialEvents);
-    setLoading(false);
+  useEffect(() => {
+    if (!onlyMine) return;
+    let cancelled = false;
+    getEventsAuthed(apiUrl, locale, { sportId, upcoming, onlyMine: true })
+      .then((items) => {
+        if (!cancelled) setMine({ key: filterKey, items });
+      })
+      .catch(() => {
+        if (!cancelled) setMine({ key: filterKey, items: [] });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiUrl, locale, sportId, upcoming, onlyMine, filterKey]);
+
+  const mineReady = mine !== null && mine.key === filterKey;
+  const events = onlyMine ? (mineReady ? mine.items : null) : initialEvents;
+
+  function hrefWith(overrides: Record<string, string | null>): string {
+    const next = new URLSearchParams(searchParams.toString());
+    for (const [key, value] of Object.entries(overrides)) {
+      if (value === null) next.delete(key);
+      else next.set(key, value);
+    }
+    const qs = next.toString();
+    return qs ? `/events?${qs}` : "/events";
   }
 
-  async function toggleMine() {
-    const next = !onlyMine;
-    setOnlyMine(next);
-    if (!next) {
-      setEvents(initialEvents);
-      return;
-    }
-    setLoading(true);
-    try {
-      setEvents(await getEventsAuthed(apiUrl, locale, { sportId, upcoming, onlyMine: true }));
-    } catch {
-      setEvents([]);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const tabClass = (active: boolean) =>
+    `rounded-full border px-4 py-1.5 transition-colors duration-200 ${
+      active
+        ? "border-brand-primary bg-brand-primary/10 text-brand-primary"
+        : "border-brand-border text-foreground/60 hover:border-brand-primary/40"
+    }`;
 
   return (
     <>
       <div className="mb-6 flex flex-wrap items-center gap-2 text-sm font-medium">
-        <Link
-          href="/events"
-          className={`rounded-full border px-4 py-1.5 transition-colors duration-200 ${
-            upcoming && !onlyMine
-              ? "border-brand-primary bg-brand-primary/10 text-brand-primary"
-              : "border-brand-border text-foreground/60 hover:border-brand-primary/40"
-          }`}
-        >
+        <Link href={hrefWith({ past: null })} className={tabClass(upcoming)}>
           {t("upcoming")}
         </Link>
-        <Link
-          href="/events?past=1"
-          className={`rounded-full border px-4 py-1.5 transition-colors duration-200 ${
-            !upcoming && !onlyMine
-              ? "border-brand-primary bg-brand-primary/10 text-brand-primary"
-              : "border-brand-border text-foreground/60 hover:border-brand-primary/40"
-          }`}
-        >
+        <Link href={hrefWith({ past: "1" })} className={tabClass(!upcoming)}>
           {t("past")}
         </Link>
-        <button
-          type="button"
-          onClick={toggleMine}
-          className={`cursor-pointer rounded-full border px-4 py-1.5 transition-colors duration-200 ${
-            onlyMine
-              ? "border-brand-primary bg-brand-primary/10 text-brand-primary"
-              : "border-brand-border text-foreground/60 hover:border-brand-primary/40"
-          }`}
-        >
+        <Link href={hrefWith({ mine: onlyMine ? null : "1" })} className={tabClass(onlyMine)}>
           {t("onlyMine")}
-        </button>
+        </Link>
       </div>
 
-      {loading ? (
+      {events === null ? (
         <p className="text-foreground/70">{t("loading")}</p>
       ) : events.length === 0 ? (
         <p className="text-foreground/70">{onlyMine ? t("emptyMine") : t("empty")}</p>
