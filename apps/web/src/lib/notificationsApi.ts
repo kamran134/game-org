@@ -12,6 +12,11 @@ export type NotificationType =
   | "ParticipantJoined"
   | "ParticipantLeft"
   | "WaitlistPromoted"
+  | "EventJoinRequest"
+  | "EventJoinApproved"
+  | "EventJoinRejected"
+  | "PaymentDue"
+  | "PaymentConfirmed"
   | "ClubInvite"
   | "ClubJoinRequest"
   | "NewFollower"
@@ -35,6 +40,49 @@ export type NotificationPreference = { type: NotificationType; enabled: boolean 
 
 function apiBase(apiUrl: string): string {
   return apiUrl.replace(/\/api\/?$/, "");
+}
+
+// Data хранит внутренние Guid'ы (eventId/clubId/followerId), а не публичные
+// идентификаторы (PublicId/slug/handle) — GetByPublicIdAsync/GetBySlugAsync/
+// GET /api/users/{handle} на бэкенде (Шаг 22) принимают Guid как альтернативу
+// публичному идентификатору, поэтому ссылка строится прямо из Data без
+// дополнительного похода за слагом.
+export function notificationHref(n: NotificationItem): string | null {
+  const data = n.data ?? {};
+  const eventId = typeof data.eventId === "string" ? data.eventId : null;
+  const clubId = typeof data.clubId === "string" ? data.clubId : null;
+  const followerId = typeof data.followerId === "string" ? data.followerId : null;
+
+  switch (n.type) {
+    case "EventJoinRequest":
+      return eventId ? `/events/${eventId}#requests` : null;
+    case "EventJoinApproved":
+    case "EventJoinRejected":
+    case "EventReminder24h":
+    case "EventReminder2h":
+    case "EventUpdated":
+    case "EventCancelled":
+    case "EventConfirmed":
+    case "ParticipantJoined":
+    case "ParticipantLeft":
+    case "WaitlistPromoted":
+    case "MvpVoteOpen":
+    case "ResultPosted":
+      return eventId ? `/events/${eventId}` : null;
+    case "PaymentDue":
+    case "PaymentConfirmed":
+      return "/me/payments";
+    case "ClubJoinRequest":
+      return clubId ? `/clubs/${clubId}/members` : null;
+    case "ClubInvite":
+      return clubId ? `/clubs/${clubId}` : null;
+    case "NewFollower":
+      return followerId ? `/${followerId}` : null;
+    case "AchievementEarned":
+      return "/me/achievements";
+    default:
+      return null;
+  }
 }
 
 export async function getNotifications(

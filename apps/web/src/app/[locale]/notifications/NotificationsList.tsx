@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { useFormatter, useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import {
   getNotifications,
   markAllNotificationsRead,
   markNotificationRead,
+  notificationHref,
   type NotificationItem,
 } from "@/lib/notificationsApi";
 
@@ -76,22 +78,33 @@ export function NotificationsList({ apiUrl }: { apiUrl: string }) {
       ) : (
         <>
           <ul className="flex flex-col gap-2">
-            {items.map((n) => (
-              <li key={n.id}>
-                <button
-                  type="button"
-                  onClick={() => handleItemClick(n)}
-                  className={`flex w-full cursor-pointer flex-col gap-1 rounded-2xl border border-brand-border bg-background px-5 py-4 text-left transition-colors duration-200 hover:border-brand-primary/40 ${
-                    n.readAt ? "" : "border-brand-primary/30"
-                  }`}
-                >
+            {items.map((n) => {
+              const href = notificationHref(n);
+              const itemClassName = `flex w-full flex-col gap-1 rounded-2xl border border-brand-border bg-background px-5 py-4 text-left transition-colors duration-200 hover:border-brand-primary/40 ${
+                n.readAt ? "" : "border-brand-primary/30"
+              }`;
+              const content = (
+                <>
                   <span className={n.readAt ? "text-foreground/70" : "font-medium text-foreground"}>{n.body}</span>
                   <span className="text-xs text-foreground/50">
                     {format.dateTime(new Date(n.createdAt), { dateStyle: "medium", timeStyle: "short" })}
                   </span>
-                </button>
-              </li>
-            ))}
+                </>
+              );
+              return (
+                <li key={n.id}>
+                  {href ? (
+                    <Link href={href} onClick={() => handleItemClick(n)} className={`${itemClassName} cursor-pointer`}>
+                      {content}
+                    </Link>
+                  ) : (
+                    <button type="button" onClick={() => handleItemClick(n)} className={`${itemClassName} cursor-pointer`}>
+                      {content}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
           </ul>
 
           {hasMore && (

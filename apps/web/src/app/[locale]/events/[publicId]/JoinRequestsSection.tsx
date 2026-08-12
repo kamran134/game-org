@@ -58,7 +58,7 @@ export function JoinRequestsSection({ apiUrl, event }: { apiUrl: string; event: 
   }
 
   return (
-    <section className="rounded-2xl border border-brand-border bg-background p-8">
+    <section id="requests" className="rounded-2xl border border-brand-border bg-background p-8">
       <h2 className="font-heading text-lg font-semibold text-foreground">{t("joinRequests.heading")}</h2>
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}

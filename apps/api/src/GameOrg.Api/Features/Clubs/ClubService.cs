@@ -94,11 +94,17 @@ public sealed class ClubService(
     /// </summary>
     public async Task<ClubDetailDto?> GetBySlugAsync(string slug, string locale, Guid? viewerId, CancellationToken ct)
     {
-        var club = await db.Clubs
+        // Notification.Data хранит внутренний Guid клуба, а не Slug (Шаг 22) —
+        // ссылка из уведомления подставляет его сюда же, поэтому лукап понимает оба.
+        var byId = Guid.TryParse(slug, out var clubId);
+        var query = db.Clubs
             .Include(c => c.City)
             .Include(c => c.Avatar)
             .Include(c => c.Sports).ThenInclude(s => s.Sport)
-            .FirstOrDefaultAsync(c => c.Slug == slug, ct);
+            .AsQueryable();
+        var club = byId
+            ? await query.FirstOrDefaultAsync(c => c.Id == clubId, ct)
+            : await query.FirstOrDefaultAsync(c => c.Slug == slug, ct);
 
         if (club is null) return null;
 

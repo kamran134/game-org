@@ -1918,10 +1918,17 @@ Add `notificationHref(n)` in `apps/web/src/lib/notificationsApi.ts`:
 
 Unknown/absent payload → render non-clickable, never a dead link to `/undefined`.
 
-Two backend spot-fixes this requires:
-- club notifications must put `slug` (not only `clubId`) in `Data`, or the frontend needs
-  an id→slug lookup; putting the slug in `Data` is cheaper.
-- `NewFollower` must carry the follower's `handle`.
+**Implemented differently than originally planned.** `Data` carries internal Guids
+(`eventId`/`clubId`/`followerId`), but the public routes are keyed by `PublicId`/`slug`/
+`handle` — the two spot-fixes above only patch two of the three mismatches, and every
+future notification call site would need to remember to add the client-facing id too.
+Instead, `EventService.GetByPublicIdAsync`, `ClubService.GetBySlugAsync`, and
+`GET /api/users/{handle}` now accept a raw Guid as an alternate match (`Guid.TryParse`
+before falling back to the string lookup) — the frontend links straight from the Guid
+already in `Data`, zero call-site changes, and it's future-proof for new notification
+types. `EventJoinRequest` links to `/events/{id}#requests` (anchor added on
+`JoinRequestsSection`); `PaymentDue`/`PaymentConfirmed` → `/me/payments`;
+`AchievementEarned` → `/me/achievements` — none of these three need an id in the URL.
 
 Apply the mapping in **both** the bell dropdown and `/notifications`. Clicking marks read
 and navigates in one action.

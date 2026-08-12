@@ -113,11 +113,17 @@ public static class ProfileEndpoints
         {
             var normalized = handle.TrimStart('@').ToLowerInvariant();
 
-            var user = await db.Users
+            // Notification.Data хранит внутренний Guid подписчика, а не Handle (Шаг 22) —
+            // ссылка из уведомления подставляет его сюда же, поэтому лукап понимает оба.
+            var byId = Guid.TryParse(handle, out var userId);
+            var usersQuery = db.Users
                 .Include(u => u.City)
                 .Include(u => u.Sports).ThenInclude(s => s.Sport)
                 .Include(u => u.Sports).ThenInclude(s => s.Positions).ThenInclude(p => p.Position)
-                .FirstOrDefaultAsync(u => u.Handle == normalized && u.Status == UserStatus.Active, ct);
+                .AsQueryable();
+            var user = byId
+                ? await usersQuery.FirstOrDefaultAsync(u => u.Id == userId && u.Status == UserStatus.Active, ct)
+                : await usersQuery.FirstOrDefaultAsync(u => u.Handle == normalized && u.Status == UserStatus.Active, ct);
 
             if (user is null || user.ProfileVisibility != Visibility.Public)
                 return Results.NotFound();

@@ -151,13 +151,19 @@ public sealed class EventService(
     /// </summary>
     public async Task<EventDetailDto?> GetByPublicIdAsync(string publicId, string locale, Guid? viewerId, CancellationToken ct)
     {
-        var ev = await db.Events
+        // Notification.Data хранит внутренний Guid события, а не PublicId (Шаг 22) —
+        // ссылка из уведомления подставляет его сюда же, поэтому лукап понимает оба.
+        var byId = Guid.TryParse(publicId, out var eventId);
+        var query = db.Events
             .Include(e => e.Sport)
             .Include(e => e.Venue)
             .Include(e => e.Participants).ThenInclude(p => p.User)
             .Include(e => e.Teams)
             .Include(e => e.Result)
-            .FirstOrDefaultAsync(e => e.PublicId == publicId, ct);
+            .AsQueryable();
+        var ev = byId
+            ? await query.FirstOrDefaultAsync(e => e.Id == eventId, ct)
+            : await query.FirstOrDefaultAsync(e => e.PublicId == publicId, ct);
 
         if (ev is null) return null;
 

@@ -9,6 +9,7 @@ import {
   getUnreadNotificationCount,
   markAllNotificationsRead,
   markNotificationRead,
+  notificationHref,
   type NotificationItem,
 } from "@/lib/notificationsApi";
 
@@ -95,19 +96,32 @@ export function NotificationBell({ apiUrl }: { apiUrl: string }) {
               <p className="px-4 py-4 text-sm text-foreground/60">{t("empty")}</p>
             ) : (
               <ul>
-                {items.map((n) => (
-                  <li key={n.id}>
-                    <button
-                      type="button"
-                      onClick={() => handleItemClick(n)}
-                      className={`block w-full cursor-pointer px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-brand-muted ${
-                        n.readAt ? "text-foreground/60" : "font-medium text-foreground"
-                      }`}
-                    >
-                      {n.body}
-                    </button>
-                  </li>
-                ))}
+                {items.map((n) => {
+                  const href = notificationHref(n);
+                  const itemClassName = `block w-full px-4 py-3 text-left text-sm transition-colors duration-200 hover:bg-brand-muted ${
+                    n.readAt ? "text-foreground/60" : "font-medium text-foreground"
+                  }`;
+                  return (
+                    <li key={n.id}>
+                      {href ? (
+                        <Link
+                          href={href}
+                          onClick={() => {
+                            setOpen(false);
+                            handleItemClick(n);
+                          }}
+                          className={`${itemClassName} cursor-pointer`}
+                        >
+                          {n.body}
+                        </Link>
+                      ) : (
+                        <button type="button" onClick={() => handleItemClick(n)} className={`${itemClassName} cursor-pointer`}>
+                          {n.body}
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
