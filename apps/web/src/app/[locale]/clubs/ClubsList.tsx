@@ -28,6 +28,18 @@ export function ClubsList({
   const [clubs, setClubs] = useState(initialClubs);
   const [loading, setLoading] = useState(false);
 
+  // Тот же сброс, что в EventsList: смена searchParams (cityId/sportId) —
+  // soft navigation по тому же роуту, инстанс переживает переход, а
+  // useState(initialClubs) сеет только на первом рендере. Без этого фильтрация
+  // из режима "Мои" залипала бы намертво.
+  const [prevInitial, setPrevInitial] = useState(initialClubs);
+  if (prevInitial !== initialClubs) {
+    setPrevInitial(initialClubs);
+    setOnlyMine(false);
+    setClubs(initialClubs);
+    setLoading(false);
+  }
+
   async function toggleMine() {
     const next = !onlyMine;
     setOnlyMine(next);

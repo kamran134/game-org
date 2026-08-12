@@ -28,6 +28,20 @@ export function EventsList({
   const [events, setEvents] = useState(initialEvents);
   const [loading, setLoading] = useState(false);
 
+  // "Ближайшие"/"Прошедшие" — <Link>, т.е. soft navigation: инстанс этого
+  // компонента переживает переход, а useState(initialEvents) сеет только на
+  // первом рендере. Без сброса переключение вкладок из режима "Мои" ничего не
+  // меняло — список и подсветка навсегда залипали на "Мои". Сброс в теле
+  // рендера (приём из React-доков для производного от пропов состояния):
+  // новый серверный рендер даёт новую ссылку на массив.
+  const [prevInitial, setPrevInitial] = useState(initialEvents);
+  if (prevInitial !== initialEvents) {
+    setPrevInitial(initialEvents);
+    setOnlyMine(false);
+    setEvents(initialEvents);
+    setLoading(false);
+  }
+
   async function toggleMine() {
     const next = !onlyMine;
     setOnlyMine(next);
