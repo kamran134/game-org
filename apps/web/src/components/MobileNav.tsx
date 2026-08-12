@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { List, X, CalendarBlank, MapPinLine, SoccerBall, UsersThree, UsersFour } from "@phosphor-icons/react";
+import { List, X, CalendarBlank, MapPinLine, UsersThree, UsersFour } from "@phosphor-icons/react";
 import { Link } from "@/i18n/navigation";
 import { LocaleSwitcher } from "@/components/LocaleSwitcher";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -64,14 +64,6 @@ export function MobileNav({ apiUrl }: { apiUrl: string }) {
             >
               <UsersFour size={18} weight="bold" />
               {t("groups")}
-            </Link>
-            <Link
-              href="/sports"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 transition-colors duration-200 hover:text-foreground"
-            >
-              <SoccerBall size={18} weight="bold" />
-              {t("sports")}
             </Link>
           </nav>
 

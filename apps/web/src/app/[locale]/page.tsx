@@ -9,10 +9,10 @@ import {
 import { Link } from "@/i18n/navigation";
 
 const FEATURES = [
-  { key: "playerCard", icon: UserCircle },
-  { key: "venues", icon: MapPinLine },
-  { key: "events", icon: Trophy },
-  { key: "rating", icon: ShieldCheck },
+  { key: "playerCard", icon: UserCircle, href: "/login" },
+  { key: "venues", icon: MapPinLine, href: "/venues" },
+  { key: "events", icon: Trophy, href: "/events" },
+  { key: "rating", icon: ShieldCheck, href: "/sports" },
 ] as const;
 
 const STEPS = ["login", "profile", "findGame"] as const;
@@ -63,17 +63,25 @@ export default async function Home() {
             {t("featuresHeading")}
           </h2>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            {FEATURES.map(({ key, icon: Icon }) => (
-              <div
+            {FEATURES.map(({ key, icon: Icon, href }) => (
+              <Link
                 key={key}
+                href={href}
                 className="group rounded-2xl border border-black/10 p-8 transition-colors duration-200 hover:border-brand-primary/40 hover:bg-brand-background dark:border-white/10 dark:hover:bg-brand-background/10"
               >
                 <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-brand-primary/10 text-brand-primary">
                   <Icon size={26} weight="bold" />
                 </div>
-                <h3 className="mb-2 text-xl font-semibold text-foreground">{t(`features.${key}.title`)}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="mb-2 text-xl font-semibold text-foreground">{t(`features.${key}.title`)}</h3>
+                  <ArrowRight
+                    size={16}
+                    weight="bold"
+                    className="mb-2 -translate-x-1 text-brand-primary opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100"
+                  />
+                </div>
                 <p className="text-base leading-7 text-foreground/70">{t(`features.${key}.description`)}</p>
-              </div>
+              </Link>
             ))}
           </div>
         </div>
