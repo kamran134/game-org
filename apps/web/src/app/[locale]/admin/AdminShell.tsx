@@ -61,7 +61,7 @@ export function AdminShell({ apiUrl, children }: { apiUrl: string; children: Rea
 
   return (
     <AdminRoleProvider value={{ userId: me.id, role: me.role }}>
-      <div className="mx-auto flex max-w-5xl flex-col gap-8 px-6 py-16 md:flex-row">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-6 py-16 md:flex-row">
         {/* Мобилка/tablet: <select> вместо колонки — по требованию Шага 23. */}
         <select
           value={activeSection?.href ?? "/admin"}
