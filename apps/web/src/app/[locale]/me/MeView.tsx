@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { fetchMe, type MeProfile } from "@/lib/authApi";
-import { getVenueModerationQueue, getVenueClaimQueue } from "@/lib/venuesApi";
-import { getReportQueue } from "@/lib/moderationApi";
+import { getAdminOverview } from "@/lib/adminApi";
 
 export function MeView({ apiUrl }: { apiUrl: string }) {
   const t = useTranslations("Me");
@@ -37,14 +36,10 @@ export function MeView({ apiUrl }: { apiUrl: string }) {
 
   useEffect(() => {
     if (!isModerator) return;
-    Promise.all([
-      getVenueModerationQueue(apiUrl, locale),
-      getReportQueue(apiUrl, locale),
-      getVenueClaimQueue(apiUrl, locale),
-    ])
-      .then(([venues, reports, claims]) => setModerationCount(venues.length + reports.length + claims.length))
+    getAdminOverview(apiUrl)
+      .then((o) => setModerationCount(o.pendingVenues + o.pendingReports + o.pendingClaims))
       .catch(() => setModerationCount(null));
-  }, [apiUrl, locale, isModerator]);
+  }, [apiUrl, isModerator]);
 
   if (loading) return <p>{t("loading")}</p>;
   if (!profile) return null;
@@ -94,10 +89,10 @@ export function MeView({ apiUrl }: { apiUrl: string }) {
 
       {isModerator && (
         <Link
-          href="/moderation"
+          href="/admin"
           className="flex items-center justify-between rounded-2xl border border-brand-border bg-background px-6 py-4 transition-colors duration-200 hover:border-brand-primary/40"
         >
-          <span className="font-medium text-foreground">{tNav("moderation")}</span>
+          <span className="font-medium text-foreground">{tNav("admin")}</span>
           {moderationCount !== null && moderationCount > 0 && (
             <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-brand-primary px-2 text-xs font-semibold text-brand-primary-foreground">
               {moderationCount}

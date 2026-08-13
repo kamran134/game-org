@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { getVenueModerationQueue, hideVenue, publishVenue, type VenueListItem } from "@/lib/venuesApi";
 
-export function VenuePublishQueue({ apiUrl }: { apiUrl: string }) {
+export function VenuesQueue({ apiUrl }: { apiUrl: string }) {
   const t = useTranslations("Moderation");
   const locale = useLocale();
 

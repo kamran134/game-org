@@ -16,7 +16,7 @@
     "events": "Tədbirlər",
     "sports": "İdman növləri",
     "myProfile": "Mənim profilim",
-    "moderation": "Moderasiya",
+    "admin": "Admin paneli",
     "login": "Giriş",
     "logout": "Çıxış",
     "menu": "Menyu",
@@ -367,8 +367,43 @@
       "saveError": "Nəticəni yazmaq mümkün olmadı"
     }
   },
+  "Admin": {
+    "loading": "Yüklənir…",
+    "noAccess": "Yalnız moderatorlar üçün əlçatandır.",
+    "sidebar": {
+      "overview": "Ümumi baxış",
+      "users": "İstifadəçilər",
+      "venues": "Meydançalar",
+      "reports": "Şikayətlər",
+      "claims": "Müraciətlər"
+    },
+    "overview": {
+      "pendingVenues": "Nəşr gözləyən meydançalar",
+      "pendingReports": "Açıq şikayətlər",
+      "pendingClaims": "Mülkiyyət müraciətləri",
+      "loadError": "Xülasə yüklənmədi"
+    },
+    "users": {
+      "searchPlaceholder": "Nik və ya ad…",
+      "allRoles": "İstənilən rol",
+      "allStatuses": "İstənilən status",
+      "active": "Aktiv",
+      "banned": "Bloklanmış",
+      "ban": "Bloklamaq",
+      "unban": "Blokdan çıxarmaq",
+      "empty": "Heç kim tapılmadı.",
+      "loadMore": "Daha çox göstər",
+      "loadError": "İstifadəçilər yüklənmədi",
+      "actionError": "Əməliyyat uğursuz oldu",
+      "joined": "{date} tarixindən",
+      "roles": {
+        "User": "İstifadəçi",
+        "Moderator": "Moderator",
+        "Admin": "Admin"
+      }
+    }
+  },
   "Moderation": {
-    "pageTitle": "Moderasiya növbəsi",
     "noAccess": "Yalnız moderatorlar üçün əlçatandır.",
     "loading": "Yüklənir…",
     "empty": "Növbə boşdur.",

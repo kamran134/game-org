@@ -56,10 +56,10 @@ export function UserMenu({ apiUrl }: { apiUrl: string }) {
       <NotificationBell apiUrl={apiUrl} />
       {(profile.role === "Moderator" || profile.role === "Admin") && (
         <Link
-          href="/moderation"
+          href="/admin"
           className="text-sm font-medium text-foreground/70 transition-colors duration-200 hover:text-foreground"
         >
-          {t("moderation")}
+          {t("admin")}
         </Link>
       )}
       <Link

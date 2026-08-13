@@ -16,7 +16,7 @@
     "events": "Events",
     "sports": "Sports",
     "myProfile": "My profile",
-    "moderation": "Moderation",
+    "admin": "Admin panel",
     "login": "Sign in",
     "logout": "Sign out",
     "menu": "Menu",
@@ -367,8 +367,43 @@
       "saveError": "Failed to record result"
     }
   },
+  "Admin": {
+    "loading": "Loading…",
+    "noAccess": "Moderators only.",
+    "sidebar": {
+      "overview": "Overview",
+      "users": "Users",
+      "venues": "Venues",
+      "reports": "Reports",
+      "claims": "Claims"
+    },
+    "overview": {
+      "pendingVenues": "Venues awaiting publish",
+      "pendingReports": "Open reports",
+      "pendingClaims": "Ownership claims",
+      "loadError": "Couldn't load the overview"
+    },
+    "users": {
+      "searchPlaceholder": "Handle or name…",
+      "allRoles": "Any role",
+      "allStatuses": "Any status",
+      "active": "Active",
+      "banned": "Banned",
+      "ban": "Ban",
+      "unban": "Unban",
+      "empty": "No one found.",
+      "loadMore": "Load more",
+      "loadError": "Couldn't load users",
+      "actionError": "Couldn't complete the action",
+      "joined": "since {date}",
+      "roles": {
+        "User": "User",
+        "Moderator": "Moderator",
+        "Admin": "Admin"
+      }
+    }
+  },
   "Moderation": {
-    "pageTitle": "Moderation queue",
     "noAccess": "Moderators only.",
     "loading": "Loading…",
     "empty": "The queue is empty.",
