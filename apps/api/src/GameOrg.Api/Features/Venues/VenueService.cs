@@ -155,7 +155,7 @@ public sealed class VenueService(
             .Where(v => v.Status == VenueStatus.Draft)
             .OrderBy(v => v.CreatedAt)
             .Take(50)
-            .Select(v => new { v.Id, v.Slug, v.NameI18n, v.AddressI18n, v.Location, v.RatingAvg, v.RatingCount })
+            .Select(v => new { v.Id, v.Slug, v.NameI18n, v.AddressI18n, v.Location, v.RatingAvg, v.RatingCount, v.IsIndoor })
             .ToListAsync(ct);
 
         return venues.Select(v => new VenueDto(
@@ -163,7 +163,7 @@ public sealed class VenueService(
             Localized.Resolve(v.NameI18n, locale) ?? "",
             Localized.Resolve(v.AddressI18n, locale),
             v.Location.Y, v.Location.X,
-            v.RatingAvg, v.RatingCount, null)).ToList();
+            v.RatingAvg, v.RatingCount, null, v.IsIndoor)).ToList();
     }
 
     /// <summary>Публикация/скрытие модератором — только эти два статуса, Draft/Merged через этот путь не выставляются.</summary>

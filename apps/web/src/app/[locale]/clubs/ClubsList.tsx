@@ -3,12 +3,16 @@
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Users, Lock } from "@phosphor-icons/react";
-import { Link } from "@/i18n/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
+import { buildFilterHref } from "@/lib/filterHref";
+import { FilterSelect } from "@/components/filters/FilterSelect";
+import { FilterPill } from "@/components/filters/FilterPill";
 import { getClubsAuthed, type ClubKind, type ClubListItem } from "@/lib/clubsApi";
 
 // Тот же принцип, что в EventsList: единственный источник истины — URL
-// (?mine=1), значения приходят пропами со страницы. Локального состояния
-// фильтра нет, поэтому рассинхрону между адресом и списком взяться неоткуда.
+// (?mine=1&sportId=..&cityId=..), значения приходят пропами со страницы.
+// Локального состояния фильтра нет, поэтому рассинхрону между адресом
+// и списком взяться неоткуда.
 export function ClubsList({
   apiUrl,
   basePath,
@@ -18,6 +22,8 @@ export function ClubsList({
   onlyMine,
   query,
   initialClubs,
+  sports,
+  cities,
 }: {
   apiUrl: string;
   basePath: "/clubs" | "/groups";
@@ -27,9 +33,12 @@ export function ClubsList({
   onlyMine: boolean;
   query: Record<string, string | undefined>;
   initialClubs: ClubListItem[];
+  sports: { id: string; name: string; emoji?: string | null }[];
+  cities: { id: string; name: string }[];
 }) {
   const t = useTranslations("Clubs");
   const locale = useLocale();
+  const router = useRouter();
   const filterKey = `${kind}|${cityId ?? ""}|${sportId ?? ""}`;
   const [mine, setMine] = useState<{ key: string; items: ClubListItem[] } | null>(null);
 
@@ -52,40 +61,49 @@ export function ClubsList({
   const clubs = onlyMine ? (mineReady ? mine.items : null) : initialClubs;
 
   function hrefWith(overrides: Record<string, string | null>): string {
-    const next = new URLSearchParams();
-    for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined) next.set(key, value);
-    }
-    for (const [key, value] of Object.entries(overrides)) {
-      if (value === null) next.delete(key);
-      else next.set(key, value);
-    }
-    const qs = next.toString();
-    return qs ? `${basePath}?${qs}` : basePath;
+    return buildFilterHref(basePath, query, overrides);
   }
 
   const emptyText = kind === "Group" ? t("emptyGroups") : t("empty");
   const emptyMineText = kind === "Group" ? t("emptyMineGroups") : t("emptyMine");
+  const hasExtraFilters = !!(sportId || cityId);
 
   return (
     <>
-      <div className="mb-6 flex items-center gap-2 text-sm font-medium">
-        <Link
-          href={hrefWith({ mine: onlyMine ? null : "1" })}
-          className={`rounded-full border px-4 py-1.5 transition-colors duration-200 ${
-            onlyMine
-              ? "border-brand-primary bg-brand-primary/10 text-brand-primary"
-              : "border-brand-border text-foreground/60 hover:border-brand-primary/40"
-          }`}
-        >
+      <div className="mb-4 flex items-center gap-2 text-sm font-medium">
+        <FilterPill href={hrefWith({ mine: onlyMine ? null : "1" })} active={onlyMine}>
           {t("onlyMine")}
-        </Link>
+        </FilterPill>
+      </div>
+
+      <div className="mb-6 flex flex-wrap items-center gap-2">
+        <FilterSelect
+          value={sportId ?? ""}
+          onChange={(v) => router.push(hrefWith({ sportId: v || null }))}
+          placeholder={t("filters.sportAll")}
+          options={sports.map((s) => ({ value: s.id, label: `${s.emoji ?? ""} ${s.name}`.trim() }))}
+        />
+        <FilterSelect
+          value={cityId ?? ""}
+          onChange={(v) => router.push(hrefWith({ cityId: v || null }))}
+          placeholder={t("filters.cityAll")}
+          options={cities.map((c) => ({ value: c.id, label: c.name }))}
+        />
       </div>
 
       {clubs === null ? (
         <p className="text-foreground/70">{t("loading")}</p>
       ) : clubs.length === 0 ? (
-        <p className="text-foreground/70">{onlyMine ? emptyMineText : emptyText}</p>
+        hasExtraFilters ? (
+          <div className="flex flex-col items-start gap-2">
+            <p className="text-foreground/70">{t("emptyFiltered")}</p>
+            <Link href={basePath} className="text-sm font-medium text-brand-primary hover:underline">
+              {t("resetFilters")}
+            </Link>
+          </div>
+        ) : (
+          <p className="text-foreground/70">{onlyMine ? emptyMineText : emptyText}</p>
+        )
       ) : (
         <ul className="flex flex-col gap-3">
           {clubs.map((c) => (

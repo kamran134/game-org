@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
-import { getEvents } from "@/lib/eventsApi";
+import { createApiClient } from "@/lib/apiClient";
+import { getEvents, type EventType } from "@/lib/eventsApi";
 import { EventsList } from "./EventsList";
 
 export const dynamic = "force-dynamic";
@@ -10,16 +11,45 @@ export default async function EventsPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ sportId?: string; past?: string; mine?: string }>;
+  searchParams: Promise<{
+    sportId?: string;
+    cityId?: string;
+    type?: string;
+    onlyFree?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    past?: string;
+    mine?: string;
+    myClubs?: string;
+  }>;
 }) {
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("Events");
   const sp = await searchParams;
   const upcoming = sp.past !== "1";
+  const type = sp.type === "Game" || sp.type === "Training" || sp.type === "Tournament" || sp.type === "Friendly" ? (sp.type as EventType) : undefined;
+  const onlyFree = sp.onlyFree === "true" ? true : sp.onlyFree === "false" ? false : undefined;
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5100";
-  const events = await getEvents(apiUrl, locale, { sportId: sp.sportId, upcoming }).catch(() => []);
+  const client = createApiClient();
+  const [cities, sports, events] = await Promise.all([
+    client.api.cities.get(),
+    client.api.sports.get(),
+    getEvents(apiUrl, locale, { sportId: sp.sportId, cityId: sp.cityId, upcoming, type, onlyFree, dateFrom: sp.dateFrom, dateTo: sp.dateTo }).catch(
+      () => [],
+    ),
+  ]);
+
+  const cityOptions = (cities ?? []).map((c) => ({
+    id: c.id!,
+    name: (c.nameI18n?.additionalData?.[locale] as string | undefined) ?? c.slug!,
+  }));
+  const sportOptions = (sports ?? []).map((s) => ({
+    id: s.id!,
+    name: (s.nameI18n?.additionalData?.[locale] as string | undefined) ?? s.slug!,
+    emoji: s.emoji,
+  }));
 
   return (
     <main className="flex-1 bg-brand-background px-6 py-16">
@@ -37,10 +67,18 @@ export default async function EventsPage({
         <EventsList
           apiUrl={apiUrl}
           sportId={sp.sportId}
+          cityId={sp.cityId}
+          type={type}
+          onlyFree={onlyFree}
+          dateFrom={sp.dateFrom}
+          dateTo={sp.dateTo}
           upcoming={upcoming}
           onlyMine={sp.mine === "1"}
+          onlyMyClubs={sp.myClubs === "1"}
           query={sp}
           initialEvents={events}
+          sports={sportOptions}
+          cities={cityOptions}
         />
       </div>
     </main>

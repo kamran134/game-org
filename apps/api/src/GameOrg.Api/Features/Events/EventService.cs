@@ -415,7 +415,8 @@ public sealed class EventService(
     }
 
     public async Task<List<EventDto>> GetListAsync(
-        Guid? sportId, Guid? cityId, bool upcoming, bool onlyMine, string locale, Guid? viewerId, CancellationToken ct)
+        Guid? sportId, Guid? cityId, bool upcoming, bool onlyMine, string locale, Guid? viewerId, CancellationToken ct,
+        bool onlyMyClubs = false, EventType? type = null, bool? onlyFree = null, DateTime? dateFrom = null, DateTime? dateTo = null)
     {
         // Public — всем; Club — только активным участникам этого клуба; Unlisted
         // (и вообще любая видимость) — ещё и создателю/участнику, иначе
@@ -431,7 +432,7 @@ public sealed class EventService(
             ? []
             : await db.EventParticipants.Where(p => p.UserId == viewerId).Select(p => p.EventId).ToListAsync(ct);
 
-        if (onlyMine && viewerId is null) return [];
+        if ((onlyMine || onlyMyClubs) && viewerId is null) return [];
 
         var query = onlyMine
             ? db.Events.Where(e => e.CreatedById == viewerId || myParticipantEventIds.Contains(e.Id))
@@ -440,8 +441,15 @@ public sealed class EventService(
                 || (e.Visibility == EventVisibility.Club && e.ClubId != null && viewerClubIds.Contains(e.ClubId.Value))
                 || (viewerId != null && (e.CreatedById == viewerId || myParticipantEventIds.Contains(e.Id))));
 
+        if (onlyMyClubs) query = query.Where(e => e.ClubId != null && viewerClubIds.Contains(e.ClubId.Value));
+
         if (sportId is not null) query = query.Where(e => e.SportId == sportId);
         if (cityId is not null) query = query.Where(e => e.Venue != null && e.Venue.CityId == cityId);
+        if (type is not null) query = query.Where(e => e.Type == type);
+        if (onlyFree is true) query = query.Where(e => e.CostSplit == CostSplit.Free);
+        else if (onlyFree is false) query = query.Where(e => e.CostSplit != CostSplit.Free);
+        if (dateFrom is not null) query = query.Where(e => e.StartsAt >= dateFrom);
+        if (dateTo is not null) query = query.Where(e => e.StartsAt < dateTo.Value.AddDays(1));
 
         var now = DateTime.UtcNow;
         query = upcoming
@@ -842,7 +850,7 @@ public sealed class EventService(
         e.CustomLocation,
         Localized.Resolve(e.TitleI18n, locale),
         e.StartsAt, e.EndsAt, e.Timezone,
-        e.MaxParticipants, e.ConfirmedCount, e.Cost, e.Currency);
+        e.MaxParticipants, e.ConfirmedCount, e.Cost, e.Currency, e.RequiresApproval);
 
     private static EventDetailDto MapDetail(
         Event e, string locale, string? mvpDisplayName, List<MvpTallyEntryDto> mvpTally, Guid? myVote, PaymentSummaryDto? myPayment) => new(

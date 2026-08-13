@@ -23,7 +23,8 @@ public sealed record EventDto(
     int? MaxParticipants,
     int ConfirmedCount,
     decimal? Cost,
-    string Currency);
+    string Currency,
+    bool RequiresApproval);
 
 public sealed record EventParticipantDto(
     Guid Id,

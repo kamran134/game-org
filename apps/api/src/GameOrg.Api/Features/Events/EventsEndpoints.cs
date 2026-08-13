@@ -17,10 +17,17 @@ public static class EventsEndpoints
             Guid? cityId,
             bool upcoming,
             CancellationToken ct,
-            bool onlyMine = false) =>
+            bool onlyMine = false,
+            bool onlyMyClubs = false,
+            EventType? type = null,
+            bool? onlyFree = null,
+            DateTime? dateFrom = null,
+            DateTime? dateTo = null) =>
         {
             var locale = RequestLocale.ResolveAndVary(ctx);
-            var events = await eventService.GetListAsync(sportId, cityId, upcoming, onlyMine, locale, GetUserId(principal), ct);
+            var events = await eventService.GetListAsync(
+                sportId, cityId, upcoming, onlyMine, locale, GetUserId(principal), ct,
+                onlyMyClubs, type, onlyFree, dateFrom, dateTo);
             return Results.Ok(events);
         })
         .WithName("GetEvents")

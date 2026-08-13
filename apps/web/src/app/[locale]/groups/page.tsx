@@ -1,5 +1,6 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
+import { createApiClient } from "@/lib/apiClient";
 import { getClubs } from "@/lib/clubsApi";
 import { ClubsList } from "../clubs/ClubsList";
 
@@ -21,8 +22,22 @@ export default async function GroupsPage({
   const sp = await searchParams;
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5100";
+  const client = createApiClient();
+  const [cities, sports, groups] = await Promise.all([
+    client.api.cities.get(),
+    client.api.sports.get(),
+    getClubs(apiUrl, locale, { cityId: sp.cityId, sportId: sp.sportId, kind: "Group" }).catch(() => []),
+  ]);
 
-  const groups = await getClubs(apiUrl, locale, { cityId: sp.cityId, sportId: sp.sportId, kind: "Group" }).catch(() => []);
+  const cityOptions = (cities ?? []).map((c) => ({
+    id: c.id!,
+    name: (c.nameI18n?.additionalData?.[locale] as string | undefined) ?? c.slug!,
+  }));
+  const sportOptions = (sports ?? []).map((s) => ({
+    id: s.id!,
+    name: (s.nameI18n?.additionalData?.[locale] as string | undefined) ?? s.slug!,
+    emoji: s.emoji,
+  }));
 
   return (
     <main className="flex-1 bg-brand-background px-6 py-16">
@@ -46,6 +61,8 @@ export default async function GroupsPage({
           onlyMine={sp.mine === "1"}
           query={sp}
           initialClubs={groups}
+          sports={sportOptions}
+          cities={cityOptions}
         />
       </div>
     </main>

@@ -14,7 +14,8 @@ public sealed record VenueDto(
     double Lng,
     decimal? RatingAvg,
     int RatingCount,
-    double? DistanceMeters);
+    double? DistanceMeters,
+    bool? IsIndoor);
 
 public sealed record VenueSportDto(SportDto Sport, int Courts);
 

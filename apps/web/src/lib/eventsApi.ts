@@ -43,6 +43,17 @@ export type EventListItem = {
   confirmedCount: number;
   cost?: number | null;
   currency: string;
+  requiresApproval: boolean;
+};
+
+export type EventListParams = {
+  sportId?: string;
+  cityId?: string;
+  upcoming?: boolean;
+  type?: EventType;
+  onlyFree?: boolean;
+  dateFrom?: string;
+  dateTo?: string;
 };
 
 export type EventParticipant = {
@@ -185,15 +196,20 @@ async function errorMessage(res: Response, fallback: string): Promise<string> {
   return problem?.detail ?? fallback;
 }
 
-export async function getEvents(
-  apiUrl: string,
-  locale: string,
-  params: { sportId?: string; cityId?: string; upcoming?: boolean },
-): Promise<EventListItem[]> {
+function eventListQuery(params: EventListParams): URLSearchParams {
   const query = new URLSearchParams();
   if (params.sportId) query.set("sportId", params.sportId);
   if (params.cityId) query.set("cityId", params.cityId);
   query.set("upcoming", params.upcoming === false ? "false" : "true");
+  if (params.type) query.set("type", params.type);
+  if (params.onlyFree !== undefined) query.set("onlyFree", String(params.onlyFree));
+  if (params.dateFrom) query.set("dateFrom", params.dateFrom);
+  if (params.dateTo) query.set("dateTo", params.dateTo);
+  return query;
+}
+
+export async function getEvents(apiUrl: string, locale: string, params: EventListParams): Promise<EventListItem[]> {
+  const query = eventListQuery(params);
 
   const res = await fetch(`${apiBase(apiUrl)}/api/events?${query.toString()}`, {
     cache: "no-store",
@@ -203,19 +219,18 @@ export async function getEvents(
   return res.json();
 }
 
-// Список — с cookie, для фильтра "Мои" (Шаг 21): страница списка сама SSR
-// анонимна (без credentials, как и остальные каталоги), "Мои" — отдельный
-// клиентский дозапрос, тот же приём, что getEventAuthed для детальной.
+// Список — с cookie, для фильтров "Мои"/"Мои клубы" (Шаг 21/24): страница
+// списка сама SSR анонимна (без credentials, как и остальные каталоги),
+// эти два — отдельный клиентский дозапрос, тот же приём, что getEventAuthed
+// для детальной.
 export async function getEventsAuthed(
   apiUrl: string,
   locale: string,
-  params: { sportId?: string; cityId?: string; upcoming?: boolean; onlyMine?: boolean },
+  params: EventListParams & { onlyMine?: boolean; onlyMyClubs?: boolean },
 ): Promise<EventListItem[]> {
-  const query = new URLSearchParams();
-  if (params.sportId) query.set("sportId", params.sportId);
-  if (params.cityId) query.set("cityId", params.cityId);
-  query.set("upcoming", params.upcoming === false ? "false" : "true");
+  const query = eventListQuery(params);
   if (params.onlyMine) query.set("onlyMine", "true");
+  if (params.onlyMyClubs) query.set("onlyMyClubs", "true");
 
   const res = await fetchWithRefresh(apiUrl, `${apiBase(apiUrl)}/api/events?${query.toString()}`, {
     credentials: "include",

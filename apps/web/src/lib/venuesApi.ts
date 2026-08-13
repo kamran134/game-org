@@ -29,6 +29,7 @@ export type VenueListItem = {
   ratingAvg?: number | null;
   ratingCount: number;
   distanceMeters?: number | null;
+  isIndoor?: boolean | null;
 };
 
 export type VenueSportItem = {
@@ -142,11 +143,12 @@ async function errorMessage(res: Response, fallback: string): Promise<string> {
 export async function getVenues(
   apiUrl: string,
   locale: string,
-  params: { cityId?: string; sportId?: string; lat?: number; lng?: number; radiusKm?: number },
+  params: { cityId?: string; sportId?: string; isIndoor?: boolean; lat?: number; lng?: number; radiusKm?: number },
 ): Promise<VenueListItem[]> {
   const query = new URLSearchParams();
   if (params.cityId) query.set("cityId", params.cityId);
   if (params.sportId) query.set("sportId", params.sportId);
+  if (params.isIndoor !== undefined) query.set("isIndoor", String(params.isIndoor));
   if (params.lat !== undefined) query.set("lat", String(params.lat));
   if (params.lng !== undefined) query.set("lng", String(params.lng));
   if (params.radiusKm !== undefined) query.set("radiusKm", String(params.radiusKm));

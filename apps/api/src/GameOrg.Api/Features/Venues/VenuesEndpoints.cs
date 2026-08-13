@@ -17,6 +17,7 @@ public static class VenuesEndpoints
             HttpContext ctx,
             Guid? cityId,
             Guid? sportId,
+            bool? isIndoor,
             double? lat,
             double? lng,
             double radiusKm = 10,
@@ -35,6 +36,9 @@ public static class VenuesEndpoints
 
             if (sportId is not null)
                 query = query.Where(v => v.Sports.Any(vs => vs.SportId == sportId));
+
+            if (isIndoor is not null)
+                query = query.Where(v => v.IsIndoor == isIndoor);
 
             Point? origin = null;
             if (lat is not null && lng is not null)
@@ -65,6 +69,7 @@ public static class VenuesEndpoints
                     v.Location,
                     v.RatingAvg,
                     v.RatingCount,
+                    v.IsIndoor,
                     DistanceMeters = origin == null ? (double?)null : v.Location.Distance(origin),
                 })
                 .ToListAsync(ct);
@@ -74,7 +79,7 @@ public static class VenuesEndpoints
                 Localized.Resolve(v.NameI18n, locale) ?? "",
                 Localized.Resolve(v.AddressI18n, locale),
                 v.Location.Y, v.Location.X,
-                v.RatingAvg, v.RatingCount, v.DistanceMeters));
+                v.RatingAvg, v.RatingCount, v.DistanceMeters, v.IsIndoor));
 
             return Results.Ok(venues);
         })
