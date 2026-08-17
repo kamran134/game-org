@@ -152,8 +152,18 @@ public sealed class RatingService(GameOrgDbContext db, AchievementService achiev
         stat.UpdatedAt = DateTime.UtcNow;
     }
 
+    /// <summary>
+    /// Вызывается дважды за один RecordResultAsync для организатора, который сам же играл
+    /// (сначала как участник в ApplyReliabilityAsync, потом здесь же — HostedEvents): между
+    /// вызовами SaveChangesAsync не было, поэтому для первой в жизни игры этого юзера строки
+    /// в БД ещё нет и второй FirstOrDefaultAsync тоже вернул бы null — Add() второй раз с тем
+    /// же ключом падал с "already being tracked". Сначала смотрим в локальный трекер.
+    /// </summary>
     private async Task<ReliabilityStat> GetOrCreateReliabilityAsync(Guid userId, CancellationToken ct)
     {
+        var tracked = db.ChangeTracker.Entries<ReliabilityStat>().FirstOrDefault(e => e.Entity.UserId == userId)?.Entity;
+        if (tracked is not null) return tracked;
+
         var stat = await db.ReliabilityStats.FirstOrDefaultAsync(s => s.UserId == userId, ct);
         if (stat is not null) return stat;
 
